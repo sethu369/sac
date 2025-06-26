@@ -1,0 +1,576 @@
+:root {
+    --bg-color: #ffffff;
+    --text-color: #000000;
+    --primary-color: #3498db;
+    --secondary-color: #f1c40f;
+    --holiday-color: #ffcccc;
+    --sunday-color: #cce5ff;
+    --working-day-color: #ffffcc;
+    --attended-color: #ccffcc;
+    --absent-color: #ffcccc;
+    --border-color: #dddddd;
+    --modal-bg: rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode {
+    --bg-color: #121212;
+    --text-color: #ffffff;
+    --primary-color: #64b5f6;
+    --secondary-color: #ffb74d;
+    --holiday-color: #f83838dc;
+    --sunday-color: #0d47a1;
+    --working-day-color: #ffffcca1;
+    --attended-color: #2e7d32;
+    --absent-color: #c62828;
+    --border-color: #ffffff;
+    --modal-bg: rgba(255, 255, 255, 0.1);
+}
+
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Courier Prime', monospace;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    padding: 20px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-color);
+}
+
+#app-title {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.status-bar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+}
+
+.status-item {
+    display: flex;
+}
+
+.sem-selector, .working-days-info {
+    margin-bottom: 15px;
+}
+
+select, input[type="date"] {
+    padding: 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+.calendar-container {
+    margin-bottom: 20px;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+}
+
+.day-header {
+    text-align: center;
+    font-weight: bold;
+    padding: 5px;
+}
+
+.calendar-day {
+    padding: 10px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    position: relative;
+}
+
+.calendar-day:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.calendar-day.sunday {
+    background-color: var(--sunday-color);
+    color: var(--text-color);
+}
+
+.calendar-day.holiday {
+    background-color: var(--holiday-color);
+    color: var(--text-color);
+}
+
+.calendar-day.working-day {
+    background-color: var(--working-day-color);
+}
+
+.calendar-day.attended::after {
+    content: "✓";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    color: green;
+}
+
+.calendar-day.absent::after {
+    content: "✗";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    color: red;
+}
+
+.holiday-controls {
+    margin-bottom: 15px;
+}
+
+.bulk-holiday {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+button {
+    padding: 5px 10px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.8;
+}
+
+.day-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.today-info {
+    text-align: right;
+    font-style: italic;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--modal-bg);
+}
+
+.modal-content {
+    background-color: var(--bg-color);
+    margin: 10% auto;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    width: 80%;
+    max-width: 500px;
+    border-radius: 5px;
+}
+
+.close-btn {
+    color: var(--text-color);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-btn:hover {
+    color: var(--primary-color);
+}
+
+.setting-option {
+    margin: 15px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.status-info p {
+    margin: 10px 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    .status-bar {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .bulk-holiday {
+        flex-wrap: wrap;
+    }
+}
+/* Previous CSS remai ns the same, add these newstyles */
+
+.page {
+    padding: 10px;
+    display: none;
+}
+
+#home-page {
+    display: block;
+}
+
+.section {
+    margin-bottom: 30px;
+    padding: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+}
+
+.holiday-types {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    margin-top: 10px;
+}
+
+.holiday-list {
+    margin-top: 15px;
+}
+
+.holiday-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+    align-items: center;
+}
+
+.holiday-actions input {
+    padding: 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+#static-holidays, #dynamic-holidays, #bulk-holidays {
+    list-style-type: none;
+}
+
+#static-holidays li, #dynamic-holidays li, #bulk-holidays li {
+    padding: 8px;
+    margin: 5px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.delete-holiday {
+    color: red;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.single-holiday {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.single-holiday input {
+    flex-grow: 1;
+    padding: 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+/* Holiday Tooltip Styles */
+.holiday-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 5px;
+    z-index: 1000;
+    font-family: 'Courier Prime', monospace;
+    font-size: 14px;
+    pointer-events: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+
+
+
+/* Add this to your existing CSS */
+#holiday-name-display {
+    margin-left: 10px;
+    padding: 2px 8px;
+    background-color: var(--holiday-color);
+    color: rgb(0, 0, 0);
+    border-radius: 10px;
+    font-size: 14px;
+    
+    
+}
+
+.dark-mode #holiday-name-display {
+    background-color: #ffffff;
+}
+
+
+
+
+
+/* Month navigation buttons */
+.calendar-header button {
+    padding: 5px 15px;
+    transition: all 0.2s;
+}
+
+.calendar-header button:active {
+    transform: scale(0.95);
+}
+
+/* Clear input styles */
+.clear-input {
+    margin-top: 5px;
+    padding: 5px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.about h2{
+margin-bottom:10px;
+margin-top: 10px;
+}
+.about p{
+margin-bottom:10px;
+margin-top: 10px;
+line-height: 1.5;
+}
+.about ul{
+padding-left: 20px;
+}
+.about ol{
+padding-left: 40px;
+}
+
+
+.wrapper .img-area,
+.social-icons a,
+.buttons button{
+  background: #ecf0f3;
+  box-shadow: -3px -3px 7px #ffffff,
+               3px 3px 5px #ceced1;
+}
+.wrapper{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 350px;
+    margin: 32px auto;
+    padding: 30px 18px;
+}
+
+.wrapper .icon i{
+  position: relative;
+  z-index: 9;
+}
+.wrapper .img-area{
+  height: 200px;
+  width: 200px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 12px rgb(80, 80, 80);
+}
+.img-area .inner-area{
+  height: calc(100% - 25px);
+  width: calc(100% - 25px);
+  border-radius: 50%;
+  display: flex;
+    align-items: center;
+    justify-content: center;
+      overflow: hidden;
+}
+.inner-area img{
+  height: 100%;
+  width: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.wrapper .name{
+  font-size: 1.3em;
+    font-weight: 600;
+  color: black;
+     margin: 10px 0 5px 0;
+    text-align: center;
+}
+.wrapper .about{
+  color: black;
+  font-weight: 400;
+  font-size: 1em;
+    text-align: center;
+    margin-bottom: 10px;
+}
+.wrapper .social-icons{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin: 18px 0 22px 0;
+}
+.social-icons a{
+  position: relative;
+  margin: 0 5px;
+  display: inline-flex;
+  text-decoration: none;
+  border-radius: 50%;
+  display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    font-size: 1.4em;
+}
+.social-icons a:hover::before,
+.wrapper .icon:hover::before,
+.buttons button:hover:before{
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  border-radius: 50%;
+  background: #ecf0f3;
+  box-shadow: inset -3px -3px 7px #ffffff,
+              inset 3px 3px 5px #ceced1;
+}
+.buttons button:hover:before{
+  z-index: -1;
+  border-radius: 5px;
+}
+.social-icons a i{
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  width: 100%;
+  height: 100%;
+  line-height: 40px;
+}
+.social-icons a.instagram i{
+  color: #E1306C;
+}
+.social-icons a.linkedin i{
+  color: #0077b5;
+}
+.social-icons a.github i{
+  color: #333;
+}
+.social-icons a.whatsapp i{
+  color: #25D366;
+}
+.wrapper .buttons{
+   display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    gap: 16px;
+    margin-top: 12px;
+}
+.buttons button{
+  position: relative;
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 12px 0;
+  color: black;
+  font-size: 17px;
+  font-weight: 400;
+  border-radius: 5px;
+  cursor: pointer;
+  z-index: 4;
+}
+
+.full-button-link {
+  width: 100%;
+  text-decoration: none;
+}
+
+@media (max-width: 500px) {
+    .wrapper {
+        max-width: 98vw;
+        padding: 18px 4vw;
+    }
+    }
