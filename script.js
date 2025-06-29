@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         settings: {
             darkMode: 'light',
-            absentPenalty: 2,
+            absentPenalty: 0,
             lastSelectedSem: null
         },
         staticHolidays: [
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
              { name: "Radha Saptami", date: "2025-02-04" },
              { name: "Maha Shivaratri", date: "2025-02-26" },
              { name: "Holi", date: "2025-03-14" },
-             { name: "Sri Rama Navami", date: "2025-04-06" }, // Fixed date from 03-06 to 04-06
+             { name: "Sri Rama Navami", date: "2025-04-06" },
              { name: "Good Friday", date: "2025-04-18" },
              { name: "Bakrid (Eid al-Adha)", date: "2025-06-07" },
              { name: "Varalakshmi Vratam", date: "2025-08-08" },
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
              { name: "Diwali", date: "2025-10-20" }
         ],
         bulkHolidays: [
-             { name: "Sankranti/Pongal Holidays", startDate: "2025-01-13", endDate: "2025-01-15" }
+             { name: "Sankranti", startDate: "2025-01-13", endDate: "2025-01-15" }
         ]
     };
     
@@ -296,22 +296,25 @@ attendanceData.lastHolidayEnd = holidayEndInput.value || null;
         semData.workingDays = [];
         
         // Add all dates in range (excluding Sundays)
+        // ...existing code...
+       // Add all dates in range (excluding Sundays and holidays)
         const currentDate = new Date(startDate);
         while (currentDate <= effectiveEndDate) {
-            if (currentDate.getDay() !== 0) { // Not Sunday
-                const dateString = formatDate(currentDate);
-                semData.workingDays.push(dateString);
-                
-                // For past dates, mark as not attended by default
-                if (currentDate < new Date()) {
-                    if (!semData.attended.includes(dateString)) {
-                        semData.attended = semData.attended.filter(d => d !== dateString);
-                    }
+            const dateString = formatDate(currentDate);
+            // Only add as working day if not a holiday
+            if (
+                currentDate.getDay() !== 0 && // Not Sunday
+                !semData.holidays.includes(dateString)
+            ) {
+                if (!semData.workingDays.includes(dateString)) {
+                    semData.workingDays.push(dateString);
                 }
+            } else {
+                // If it's a holiday, ensure it's not in workingDays
+                semData.workingDays = semData.workingDays.filter(d => d !== dateString);
             }
             currentDate.setDate(currentDate.getDate() + 1);
         }
-        
         saveData();
     }
     
@@ -406,19 +409,32 @@ attendanceData.lastHolidayEnd = holidayEndInput.value || null;
                 dayElement.classList.add('holiday');
             }
             
-            // Check if working day
-            if (semData.workingDays.includes(dateString)) {
+         
+            // Check if the date is any kind of holiday
+            const isHoliday =
+                semData.holidays.includes(dateString) ||
+                attendanceData.staticHolidays.some(h => h.date === monthDayStr) ||
+                attendanceData.dynamicHolidays.some(h => h.date === dateString) ||
+                attendanceData.bulkHolidays.some(h => {
+                    const start = new Date(h.startDate);
+                    const end = new Date(h.endDate);
+                    const current = new Date(dateString);
+                    return current >= start && current <= end;
+                });
+
+            if (!isHoliday && semData.workingDays.includes(dateString)) {
                 dayElement.classList.add('working-day');
-                
+
                 // Check attendance status (only for past dates)
                 if (date < new Date()) {
                     if (semData.attended.includes(dateString)) {
                         dayElement.classList.add('attended');
-                    } else if (isWorkingDay(date) && !semData.holidays.includes(dateString)) {
+                    } else if (isWorkingDay(date)) {
                         dayElement.classList.add('absent');
                     }
                 }
             }
+            // ...existing code...
             
             // Highlight today
             if (day === currentDate.getDate() && month === currentDate.getMonth() && year === currentDate.getFullYear()) {
@@ -450,12 +466,33 @@ attendanceData.lastHolidayEnd = holidayEndInput.value || null;
     const dateString = formatDate(date);
     
     // Update checkboxes
-    workingDayCheckbox.checked = semData.workingDays.includes(dateString);
-    collegeLeaveCheckbox.checked = semData.holidays.includes(dateString);
-    wentToCollegeCheckbox.checked = semData.attended.includes(dateString);
-    
-    renderCalendar(currentMonth, currentYear);
-}
+   // ...existing code...
+    // Check if the date is any kind of holiday
+    const monthDayStr = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const isStaticHoliday = attendanceData.staticHolidays.some(h => h.date === monthDayStr);
+    const isDynamicHoliday = attendanceData.dynamicHolidays.some(h => h.date === dateString);
+    const isBulkHoliday = attendanceData.bulkHolidays.some(h => {
+        const start = new Date(h.startDate);
+        const end = new Date(h.endDate);
+        const current = new Date(dateString);
+        return current >= start && current <= end;
+    });
+    const isSemesterHoliday = semData.holidays.includes(dateString);
+
+    if (isStaticHoliday || isDynamicHoliday || isBulkHoliday || isSemesterHoliday) {
+        // If any holiday, uncheck all
+        workingDayCheckbox.checked = false;
+        collegeLeaveCheckbox.checked = false;
+        wentToCollegeCheckbox.checked = false;
+    } else {
+        workingDayCheckbox.checked = semData.workingDays.includes(dateString);
+        collegeLeaveCheckbox.checked = false;
+        wentToCollegeCheckbox.checked = semData.attended.includes(dateString);
+    }
+    // ...existing code...
+        
+        renderCalendar(currentMonth, currentYear);
+    }
     
     // Check if a date is a working day (not Sunday and not holiday)
     function isWorkingDay(date) {
@@ -666,93 +703,113 @@ attendanceData.lastHolidayEnd = holidayEndInput.value || null;
             updateStatusDisplay();
         });
         
-        // Working day checkbox
-        workingDayCheckbox.addEventListener('change', () => {
-            const currentSem = semesterSelect.value;
-            if (!currentSem) {
-                alert('Please select a semester first');
-                workingDayCheckbox.checked = false;
-                return;
-            }
-            
-            const semData = attendanceData.semesters[currentSem];
-            const dateString = formatDate(selectedDate);
-            
-            if (workingDayCheckbox.checked) {
-                if (!semData.workingDays.includes(dateString)) {
-                    semData.workingDays.push(dateString);
-                }
-            } else {
-                semData.workingDays = semData.workingDays.filter(d => d !== dateString);
-                // Also remove from attended if no longer a working day
-                semData.attended = semData.attended.filter(d => d !== dateString);
-                wentToCollegeCheckbox.checked = false;
-            }
-            
-            saveData();
-            renderCalendar(currentMonth, currentYear);
-            updateStatusDisplay();
-        });
-        
-        // College leave checkbox
-        collegeLeaveCheckbox.addEventListener('change', () => {
-            const currentSem = semesterSelect.value;
-            if (!currentSem) {
-                alert('Please select a semester first');
-                collegeLeaveCheckbox.checked = false;
-                return;
-            }
-            
-            const semData = attendanceData.semesters[currentSem];
-            const dateString = formatDate(selectedDate);
-            
-            if (collegeLeaveCheckbox.checked) {
-                if (!semData.holidays.includes(dateString)) {
-                    semData.holidays.push(dateString);
-                }
-                // If marked as holiday, can't be a working day or attended
-                semData.workingDays = semData.workingDays.filter(d => d !== dateString);
-                semData.attended = semData.attended.filter(d => d !== dateString);
-                workingDayCheckbox.checked = false;
-                wentToCollegeCheckbox.checked = false;
-            } else {
-                semData.holidays = semData.holidays.filter(d => d !== dateString);
-            }
-            
-            saveData();
-            renderCalendar(currentMonth, currentYear);
-            updateStatusDisplay();
-        });
-        
-        // Went to college checkbox
-        wentToCollegeCheckbox.addEventListener('change', () => {
-            const currentSem = semesterSelect.value;
-            if (!currentSem) {
-                alert('Please select a semester first');
-                wentToCollegeCheckbox.checked = false;
-                return;
-            }
-            
-            const semData = attendanceData.semesters[currentSem];
-            const dateString = formatDate(selectedDate);
-            
-            if (wentToCollegeCheckbox.checked) {
-                if (!semData.attended.includes(dateString)) {
-                    semData.attended.push(dateString);
-                }
-                // To attend, must be a working day
-                if (!semData.workingDays.includes(dateString)) {
-                    semData.workingDays.push(dateString);
-                    workingDayCheckbox.checked = true;
-                }
-            } else {
-                semData.attended = semData.attended.filter(d => d !== dateString);
-            }
-            
-            saveData();
-            renderCalendar(currentMonth, currentYear);
-            updateStatusDisplay();
-        });
+       // ...existing code...
+
+// Working day checkbox
+workingDayCheckbox.addEventListener('change', () => {
+    const currentSem = semesterSelect.value;
+    if (!currentSem) {
+        alert('Please select a semester first');
+        workingDayCheckbox.checked = false;
+        return;
+    }
+
+    const semData = attendanceData.semesters[currentSem];
+    const dateString = formatDate(selectedDate);
+
+    if (workingDayCheckbox.checked) {
+        // Uncheck college leave if working day is checked
+        collegeLeaveCheckbox.checked = false;
+        // Add to working days
+        if (!semData.workingDays.includes(dateString)) {
+            semData.workingDays.push(dateString);
+        }
+    } else {
+        // Remove from working days
+        semData.workingDays = semData.workingDays.filter(d => d !== dateString);
+        // Also remove from attended if no longer a working day
+        semData.attended = semData.attended.filter(d => d !== dateString);
+        wentToCollegeCheckbox.checked = false;
+    }
+
+    // Remove from holidays if working day is checked
+    if (workingDayCheckbox.checked) {
+        semData.holidays = semData.holidays.filter(d => d !== dateString);
+    }
+
+    saveData();
+    renderCalendar(currentMonth, currentYear);
+    updateStatusDisplay();
+});
+
+// College leave checkbox
+collegeLeaveCheckbox.addEventListener('change', () => {
+    const currentSem = semesterSelect.value;
+    if (!currentSem) {
+        alert('Please select a semester first');
+        collegeLeaveCheckbox.checked = false;
+        return;
+    }
+
+    const semData = attendanceData.semesters[currentSem];
+    const dateString = formatDate(selectedDate);
+
+    if (collegeLeaveCheckbox.checked) {
+        // Uncheck working day and went to college if college leave is checked
+        workingDayCheckbox.checked = false;
+        wentToCollegeCheckbox.checked = false;
+        // Add to holidays
+        if (!semData.holidays.includes(dateString)) {
+            semData.holidays.push(dateString);
+        }
+        // Remove from working days and attended
+        semData.workingDays = semData.workingDays.filter(d => d !== dateString);
+        semData.attended = semData.attended.filter(d => d !== dateString);
+    } else {
+        // Remove from holidays
+        semData.holidays = semData.holidays.filter(d => d !== dateString);
+    }
+
+    saveData();
+    renderCalendar(currentMonth, currentYear);
+    updateStatusDisplay();
+});
+
+// Went to college checkbox
+wentToCollegeCheckbox.addEventListener('change', () => {
+    const currentSem = semesterSelect.value;
+    if (!currentSem) {
+        alert('Please select a semester first');
+        wentToCollegeCheckbox.checked = false;
+        return;
+    }
+
+    const semData = attendanceData.semesters[currentSem];
+    const dateString = formatDate(selectedDate);
+
+    if (wentToCollegeCheckbox.checked) {
+        // Auto-check working day, uncheck college leave
+        workingDayCheckbox.checked = true;
+        collegeLeaveCheckbox.checked = false;
+        // Add to attended
+        if (!semData.attended.includes(dateString)) {
+            semData.attended.push(dateString);
+        }
+        // Add to working days if not already
+        if (!semData.workingDays.includes(dateString)) {
+            semData.workingDays.push(dateString);
+        }
+        // Remove from holidays
+        semData.holidays = semData.holidays.filter(d => d !== dateString);
+    } else {
+        // Remove from attended
+        semData.attended = semData.attended.filter(d => d !== dateString);
+    }
+
+    saveData();
+    renderCalendar(currentMonth, currentYear);
+    updateStatusDisplay();
+});
         
         // Add holiday button
         addHolidayBtn.addEventListener('click', () => {
@@ -834,6 +891,8 @@ attendanceData.lastHolidayEnd = holidayEndInput.value || null;
             const semData = attendanceData.semesters[currentSem];
             
             // Add all dates in range
+            // ...existing code...
+            // Add all dates in range
             const currentDate = new Date(startDate);
             while (currentDate <= endDate) {
                 const dateString = formatDate(currentDate);
@@ -841,8 +900,13 @@ attendanceData.lastHolidayEnd = holidayEndInput.value || null;
                     semData.holidays.push(dateString);
                     semData.holidayNames[dateString] = holidayName;
                 }
+                // Remove from working days if present
+                semData.workingDays = semData.workingDays.filter(d => d !== dateString);
+                // Remove from attended if present
+                semData.attended = semData.attended.filter(d => d !== dateString);
                 currentDate.setDate(currentDate.getDate() + 1);
             }
+            // ...existing code...
             
             // Add to bulk holidays
             attendanceData.bulkHolidays.push({
