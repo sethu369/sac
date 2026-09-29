@@ -3,24 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SAC - Student Attendance Calculator | Attendance Tracker for Students</title>
-<meta name="description" content="Track attendance across 8 semesters with automatic percentage calculations, holiday management, penalty adjustments, working day tracking, and offline support.">
-<meta name="keywords" content="attendance tracker, attendance calculator, college attendance, student attendance tracker, semester attendance, attendance percentage calculator">
+<title>SAC - Student Attendance Calculator | School &amp; College Attendance Tracker</title>
+<meta name="description" content="Track attendance from LKG to college across classes and semesters, with target and penalty calculators, holiday import, leave reasons, and offline support.">
+<meta name="keywords" content="attendance tracker, attendance calculator, school attendance, college attendance, semester attendance, bunk calculator">
 <meta name="author" content="SETHU">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://sacsite.vercel.app/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="SAC - Student Attendance Calculator">
-<meta property="og:description" content="Track attendance, holidays, working days, and attendance percentage across multiple semesters.">
+<meta property="og:description" content="Track attendance, holidays and target percentage from LKG through college.">
 <meta property="og:url" content="https://sacsite.vercel.app/">
 <meta property="og:image" content="https://sacsite.vercel.app/saclogo.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#2563eb">
+<meta name="theme-color" content="#13294b">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SAC">
 <link rel="icon" type="image/png" href="saclogo.png">
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
@@ -41,12 +41,30 @@
   </header>
 
   <main class="home">
+    <div class="edu-toggle" role="tablist" aria-label="Education level">
+      <button class="seg" data-edu="school" role="tab" aria-selected="false">School</button>
+      <button class="seg" data-edu="college" role="tab" aria-selected="false">College</button>
+    </div>
+
+    <p class="notice" id="parent-note" hidden>This class is meant to be tracked with a parent or guardian's help. Advanced settings are hidden to keep things simple.</p>
+
     <section class="stats" aria-label="Attendance summary">
-      <label class="card"><span class="lbl">Semester</span>
-        <select id="semester"></select></label>
-      <div class="card"><span class="lbl">Attendance</span><b id="attendance-display">0 / 0</b></div>
+      <label class="card"><span class="lbl" id="level-label">Semester</span>
+        <select id="level"></select></label>
+      <div class="card"><span class="lbl" id="attend-label">Attendance</span><b id="attendance-display">0 / 0</b></div>
       <div class="card"><span class="lbl">Percentage</span><b id="percentage-display">0.00%</b>
-        <i class="bar"><i id="bar-fill"></i></i></div>
+        <i class="bar"><i id="bar-fill"></i><i id="bar-target"></i></i></div>
+    </section>
+
+    <section class="target-banner" id="target-banner">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+      <span id="target-msg">Set a start date to see your target status.</span>
+      <button id="target-edit" class="linklike">Target: <b id="target-value">75%</b></button>
+    </section>
+
+    <section class="drop-banner" id="drop-banner" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
+      <span id="drop-msg">—</span>
     </section>
 
     <section class="range" aria-label="Working days range">
@@ -63,16 +81,25 @@
       </div>
       <div class="wk"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
       <div class="grid" id="calendar-grid"></div>
-      <div class="legend"><span class="k at">Attended</span><span class="k ab">Absent</span><span class="k hol">Holiday</span><span class="k sun">Sunday</span></div>
+      <div class="legend"><span class="k at" id="legend-at">Attended</span><span class="k ab">Absent</span><span class="k hol">Holiday</span><span class="k sun">Sunday</span></div>
     </section>
 
     <section class="day">
       <div class="day-info"><b id="today-date"></b><span id="holiday-name-display"></span></div>
       <div class="toggles">
         <label class="chip"><input type="checkbox" id="working-day"><span>Working</span></label>
-        <label class="chip"><input type="checkbox" id="college-leave"><span>Leave</span></label>
-        <label class="chip"><input type="checkbox" id="went-to-college"><span>Attended</span></label>
+        <label class="chip"><input type="checkbox" id="college-leave"><span id="leave-label">College Leave</span></label>
+        <label class="chip"><input type="checkbox" id="went-to-college"><span id="attend-chip-label">Attended</span></label>
         <button id="add-holiday-btn" class="solid">+ Holiday</button>
+      </div>
+      <div class="leave-reason" id="leave-reason-wrap" hidden>
+        <select id="leave-reason-type">
+          <option value="">Reason (optional)</option>
+          <option>Sick leave</option><option>Personal work</option><option>Family function</option>
+          <option>Medical appointment</option><option>Travel</option><option value="Other">Other</option>
+        </select>
+        <input type="text" id="leave-reason-note" placeholder="Add a note (optional)" maxlength="80">
+        <button id="leave-reason-clear" class="ghost" type="button">Clear</button>
       </div>
     </section>
   </main>
@@ -83,22 +110,52 @@
   <div class="sheet">
     <div class="sheet-head"><button id="back-btn" class="ghost">&#8249; Back</button><h2>Settings</h2></div>
     <div class="sheet-body">
-      <div class="block"><h3>This semester</h3>
+      <div class="block"><h3 id="summary-title">This semester</h3>
         <dl class="kv">
-          <dt>Working days</dt><dd id="total-working-days">0</dd>
+          <dt id="wd-label">Working days</dt><dd id="total-working-days">0</dd>
           <dt>Holidays (excl. Sundays)</dt><dd id="total-holidays">0</dd>
-          <dt>Days attended</dt><dd id="total-attended">0</dd>
+          <dt id="attended-label">Days attended</dt><dd id="total-attended">0</dd>
           <dt>Percentage</dt><dd id="modal-percentage">0.00%</dd>
-        </dl></div>
+        </dl>
+        <label class="row" id="academic-year-row">Academic year <input type="text" id="academic-year" placeholder="e.g. 2025-26" maxlength="20"></label>
+      </div>
+
+      <div class="block" id="target-block"><h3>Target &amp; penalty</h3>
+        <label class="row">Minimum attendance required
+          <span><input type="number" id="target-percent" min="1" max="100" step="1"> %</span></label>
+        <label class="row">Extra penalty per absence <span class="hint-inline">(optional, on top of the natural drop)</span>
+          <span><input type="number" id="extra-penalty" min="0" max="100" step="0.1"> pts</span></label>
+        <p class="hint" id="target-detail">Set a start date on the home screen to see your status.</p>
+        <p class="hint" id="drop-detail"></p></div>
+
+      <div class="block" id="projection-block" hidden><h3>Projection</h3>
+        <p class="hint" id="projection-detail"></p></div>
+
       <div class="block"><h3>Preferences</h3>
         <label class="row">Theme
-          <select id="dark-mode-select"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
-        <label class="row">Percentage drop per absent day
-          <span><input type="number" id="absent-penalty" min="0" max="100" step="0.1"> %</span></label></div>
-      <div class="block"><div class="row"><h3>Holidays</h3><button id="settings-add-holiday" class="solid">+ Add</button></div>
+          <select id="dark-mode-select"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div>
+
+      <div class="block"><h3>Daily reminder</h3>
+        <label class="row">Remind me to mark attendance
+          <input type="checkbox" id="reminder-enabled"></label>
+        <label class="row">At
+          <input type="time" id="reminder-time"></label>
+        <p class="hint" id="reminder-status">Reminders are off.</p>
+        <p class="hint">Reminders skip holidays and non-working days automatically. On most browsers this only fires while SAC is open in a tab — it can't reliably wake a closed app in the background.</p></div>
+
+      <div class="block"><h3>Backup</h3>
+        <div class="row"><span class="hint">Save all data as a file, or restore it on another device.</span></div>
+        <div class="two"><button id="export-btn" class="solid">Export backup</button>
+          <label class="ghost file-btn">Import backup<input type="file" id="import-input" accept="application/json" hidden></label></div></div>
+
+      <div class="block"><div class="row"><h3>Holidays</h3>
+          <button id="import-holidays-btn" class="solid">Import holidays</button></div>
+        <div class="row"><button id="settings-add-holiday" class="ghost">+ Add manually</button>
+          <button id="gcal-btn" class="ghost" disabled title="Requires a secure server-side connection – coming soon">Connect Google Calendar</button></div>
         <ul id="holiday-list"></ul></div>
+
       <details class="block about"><summary>About this app</summary>
-        <p>SAC tracks college attendance across 8 semesters. Pick a semester, set the start date, and tick "Till today" so the end date moves forward every day automatically. Tap a date to mark it Working, Leave or Attended. Holidays can be single days, yearly repeats or date ranges. Everything is saved in your browser and works offline.</p></details>
+        <p>SAC tracks attendance from LKG through college. Choose School or College, pick your class or semester, then set the start date and tick "Till today" so the end date moves forward every day automatically. The Target section tells you how many days you can safely miss or need to attend. Leave reasons and all your records stay on this device only — they are never uploaded anywhere. Everything works offline; importing holidays is the only feature that needs the internet.</p></details>
     </div>
   </div>
 </section>
@@ -113,6 +170,20 @@
     <div class="acts"><button type="button" id="hol-cancel" class="ghost">Cancel</button><button type="submit" class="solid">Save</button></div>
   </form>
 </dialog>
+
+<dialog id="import-dlg">
+  <form method="dialog" id="import-form">
+    <h3>Import holidays</h3>
+    <p class="hint">Fetches national public holidays for India from a public holiday API. Regional and state-specific festival dates aren't covered — add those manually below if you need them.</p>
+    <div class="two"><label>Year <select id="import-year"></select></label>
+      <button type="button" id="import-fetch" class="solid">Fetch</button></div>
+    <div id="import-status" class="hint"></div>
+    <ul id="import-list" class="import-list"></ul>
+    <div class="acts"><button type="button" id="import-cancel" class="ghost">Cancel</button>
+      <button type="submit" id="import-apply" class="solid" disabled>Import selected</button></div>
+  </form>
+</dialog>
+
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="script.js"></script>
 </body>
