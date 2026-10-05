@@ -384,13 +384,98 @@ const soFarStats = s => statsRange(s, s.startDate, cutoffDate(s));
    used only for target reachability. Kept internally even though the old "Semester overview"
    UI that used to display it has been removed. */
 function remainingWorkingDays(s) {
-  if (!s.endDate || !s.startDate) return null;
+
+  if (!s.startDate || !s.endDate) return null;
+
   const t = today();
+
+  // Till Today ON:
+  // Remaining means working days between the attendance
+  // calculation cutoff and the configured end date.
+  //
+  // But the target calculation should use the full configured
+  // semester only when Till Today is OFF.
+
+  if (s.tillToday) {
+    const cutoff = cutoffDate(s);
+
+    if (!cutoff || cutoff >= s.endDate) return 0;
+
+    let n = 0;
+
+    for (
+      let d = addDays(cutoff, 1);
+      d <= s.endDate;
+      d = addDays(d, 1)
+    ) {
+      if (working(d, s)) n++;
+    }
+
+    return n;
+  }
+
+  // Till Today OFF:
+  // The full configured range is active.
+  // Remaining = future working days after today.
   if (s.endDate <= t) return 0;
+
   let n = 0;
-  for (let d = addDays(t, 1); d <= s.endDate; d = addDays(d, 1)) if (working(d, s)) n++;
+
+  for (
+    let d = addDays(t, 1);
+    d <= s.endDate;
+    d = addDays(d, 1)
+  ) {
+    if (working(d, s)) n++;
+  }
+
   return n;
 }
+
+function remainingForTarget(s, soFar) {
+
+  if (!s.startDate || !s.endDate) return null;
+
+  /*
+   * Till Today ON:
+   *
+   * The attendance calculation is only up to today.
+   * Therefore "remaining" for the current calculation
+   * means unmarked working days inside the configured
+   * range that are already part of the active calculation.
+   *
+   * Since future dates are not part of the Till Today
+   * calculation, there are no future days in that window.
+   */
+  if (s.tillToday) {
+    const cutoff = cutoffDate(s);
+
+    if (!cutoff) return null;
+
+    let total = 0;
+
+    for (
+      let d = s.startDate;
+      d <= cutoff;
+      d = addDays(d, 1)
+    ) {
+      if (working(d, s) && !s.attended.includes(d) && !s.absent.includes(d)) {
+        total++;
+      }
+    }
+
+    return total;
+  }
+
+  /*
+   * Till Today OFF:
+   *
+   * Use future working days from today to the configured
+   * semester end.
+   */
+  return remainingWorkingDays(s);
+}
+
 function holidayCount(s, from, to) {
   let hd = 0;
   if (!from || !to || to < from) return 0;
@@ -399,22 +484,83 @@ function holidayCount(s, from, to) {
 }
 
 /* ---------- Target math (penalty-aware; verified against spec examples) ---------- */
-function targetInfo(soFar, remaining, targetPct, extra) {
-  if (!soFar.wd) return { ok: false, text: 'Set a start and end date (or turn on Till Today) to see your target status.' };
-  const raw = soFar.p, adjusted = Math.max(0, raw - extra);
-  const diff = adjusted - targetPct;
-  let text, state;
-  if (Math.abs(diff) < 0.005) { text = "You're at your target."; state = 'good'; }
-  else if (diff > 0) { text = `You're ${diff.toFixed(2)} percentage points above your target.`; state = 'good'; }
-  else {
-    const T2 = Math.min(0.999, (targetPct + extra) / 100);
-    const need = Math.max(0, Math.ceil((T2 * soFar.wd - soFar.at) / (1 - T2)));
-    if (remaining !== null && need > remaining) { text = `${targetPct}% cannot be reached within the remaining working days.`; state = 'warn'; }
-    else { text = `You're ${Math.abs(diff).toFixed(2)} percentage points below your ${targetPct}% target.` + (need > 0 ? ` Attend the next ${need} working day${need === 1 ? '' : 's'} to reach ${targetPct}%.` : ''); state = 'warn'; }
+
+function totalWorkingDays(s) {
+  if (!s.startDate || !s.endDate || s.endDate < s.startDate) return 0;
+
+  let n = 0;
+  for (let d = s.startDate; d <= s.endDate; d = addDays(d, 1)) {
+    if (working(d, s)) n++;
   }
-  return { ok: true, text, state, raw, adjusted };
+
+  return n;
 }
 
+function targetInfo(soFar, remaining, targetPct, extra, totalWorking) {
+
+  if (!soFar.wd && !totalWorking) {
+    return {
+      ok: false,
+      text: 'Set a start and end date to see your target status.'
+    };
+  }
+
+  const adjusted = Math.max(0, soFar.p - extra);
+  const target = (targetPct + extra) / 100;
+
+  // Already reached target.
+  if (adjusted >= targetPct) {
+    return {
+      ok: true,
+      text: `You reached your ${targetPct}% target.`,
+      state: 'good',
+      raw: soFar.p,
+      adjusted
+    };
+  }
+
+  /*
+   * IMPORTANT:
+   *
+   * Till Today ON:
+   * Use the current attendance window only.
+   *
+   * Till Today OFF:
+   * Use the full configured range.
+   */
+  const requiredTotal = Math.ceil(target * totalWorking);
+
+  const need = Math.max(
+    0,
+    requiredTotal - soFar.at
+  );
+
+  /*
+   * When Till Today is ON, the active range ends today.
+   * Therefore the remaining days for the current calculation
+   * are the working days between today and the configured end.
+   *
+   * When Till Today is OFF, `remaining` is already the actual
+   * future working days.
+   */
+  if (remaining !== null && need > remaining) {
+    return {
+      ok: true,
+      text: `You need to attend ${need} more days, but only ${remaining} working days remain. ${targetPct}% cannot be reached.`,
+      state: 'warn',
+      raw: soFar.p,
+      adjusted
+    };
+  }
+
+  return {
+    ok: true,
+    text: `You need to attend ${need} more of the ${remaining} future working days to reach ${targetPct}%.`,
+    state: 'warn',
+    raw: soFar.p,
+    adjusted
+  };
+}
 /* ---------- UI helpers ---------- */
 let tt; const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 3200); };
 const dropArr = (a, ds) => a.filter(d => d !== ds);
@@ -475,8 +621,21 @@ function render() {
 
   const s = cur();
   applyTerms();
-  const cutoff = cutoffDate(s), soFar = soFarStats(s), remaining = remainingWorkingDays(s), extra = D.settings.extraPenalty || 0;
-  const ti = targetInfo(soFar, remaining, D.settings.targetPercent, extra);
+
+  const cutoff = cutoffDate(s),
+        soFar = soFarStats(s),
+        remaining = remainingWorkingDays(s),
+        targetRemaining = remainingForTarget(s, soFar),
+        totalWorking = totalWorkingDays(s),
+        extra = D.settings.extraPenalty || 0;
+
+  const ti = targetInfo(
+    soFar,
+    targetRemaining,
+    D.settings.targetPercent,
+    extra,
+    totalWorking
+  );
 
   $('start-date').value = s.startDate || '';
   $('end-date').value = s.endDate || '';
@@ -673,6 +832,11 @@ let pending = {
   semesters: null
 };
 
+const userManualDlg = $('user-manual-dlg');
+
+function showUserManual() {
+  userManualDlg.showModal();
+}
 
 /* ---------- Education UI helpers ---------- */
 
@@ -1121,15 +1285,15 @@ $('edu-cancel').onclick = () => eduDlg.close();
 
 $('edu-form').onsubmit = () => {
 
+  // Show the guide only for the first successful education setup.
+  const firstEducationSetup = !D.settings.userManualShown;
+
   D.settings.mode = pending.mode;
 
   D.settings.category = pending.category;
 
   D.settings.classId =
-    (
-      pending.category === 'school' ||
-      pending.category === 'intermediate'
-    )
+    (pending.category === 'school' || pending.category === 'intermediate')
       ? pending.classId
       : null;
 
@@ -1148,21 +1312,24 @@ $('edu-form').onsubmit = () => {
       ? pending.semesters
       : null;
 
-  // Keep the selected semester valid.
-  if (SEMWISE.has(pending.category)) {
-    if (
-      !Number.isInteger(D.settings.semester) ||
-      D.settings.semester < 1 ||
-      D.settings.semester > D.settings.semesters
-    ) {
-      D.settings.semester = 1;
-    }
-  } else {
-    D.settings.semester = null;
+  if (
+    SEMWISE.has(pending.category) &&
+    (!D.settings.semester || D.settings.semester > D.settings.semesters)
+  ) {
+    D.settings.semester = 1;
+  }
+
+  // Remember that the first-time guide has been shown.
+  if (firstEducationSetup) {
+    D.settings.userManualShown = true;
   }
 
   save();
   render();
+
+  if (firstEducationSetup) {
+    showUserManual();
+  }
 
   toast('Saved: ' + configSummary());
 };

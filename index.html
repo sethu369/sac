@@ -151,40 +151,82 @@
       <input type="text" id="edu-other-name" placeholder="Enter course or education name" maxlength="60">
     </div>
 
-<div id="edu-duration-wrap" hidden>
-  <label class="row-label" for="edu-years-count">Select no. of years</label>
-  <input
-    type="number"
-    id="edu-years-count"
-    min="1"
-    max="12"
-    step="1"
-    inputmode="numeric"
-    placeholder="Enter number of years"
-  >
-</div>
-
-<div id="edu-semesters-wrap" hidden>
-  <label class="row-label" for="edu-semesters-count">Select no. of semesters</label>
-  <input
-    type="number"
-    id="edu-semesters-count"
-    min="1"
-    max="24"
-    step="1"
-    inputmode="numeric"
-    placeholder="Enter number of semesters"
-  >
-</div>
-
-    <div id="edu-selected-wrap" hidden class="edu-fixed">
-      <div class="dur-years" id="edu-selected-years"></div>
-      <div class="dur-sem" id="edu-selected-sem"></div>
+    <div id="edu-duration-wrap" hidden>
+      <label class="row-label" for="edu-years-count">Select no. of years</label>
+      <input
+        style="width: 100%;"
+        type="number"
+        id="edu-years-count"
+        min="1"
+        max="12"
+        step="1"
+        inputmode="numeric"
+        placeholder="Enter number of years"
+      >
     </div>
+    
+    <div id="edu-semesters-wrap" hidden>
+      <label class="row-label" for="edu-semesters-count">Select no. of semesters</label>
+      <input
+        style="width: 100%;"
+        type="number"
+        id="edu-semesters-count"
+        min="1"
+        max="24"
+        step="1"
+        inputmode="numeric"
+        placeholder="Enter number of semesters"
+      >
+    </div>
+    
+        <div id="edu-selected-wrap" hidden class="edu-fixed">
+          <div class="dur-years" id="edu-selected-years"></div>
+          <div class="dur-sem" id="edu-selected-sem"></div>
+        </div>
+    
+        <div class="acts"><button type="button" id="edu-cancel" class="ghost">Cancel</button><button type="submit" id="edu-save" class="solid" disabled>Save</button></div>
+      </form>
+    </dialog>
 
-    <div class="acts"><button type="button" id="edu-cancel" class="ghost">Cancel</button><button type="submit" id="edu-save" class="solid" disabled>Save</button></div>
-  </form>
-</dialog>
+    <!-- First-time User Manual -->
+    <dialog id="user-manual-dlg" class="user-manual">
+      <form method="dialog">
+    
+        <h3>How SAC works</h3>
+    
+        <div class="manual-step">
+          <strong>1. Set your date range</strong>
+          <p>
+            Enter the start and end date of your semester or academic year.
+          </p>
+        </div>
+    
+        <div class="manual-step">
+          <strong>2. Don't know when it ends?</strong>
+          <p>
+            Turn on <b>Till Today</b>. SAC will calculate your attendance only up to today.
+          </p>
+        </div>
+    
+        <div class="manual-step">
+          <strong>3. Mark your attendance</strong>
+          <p>
+            Mark each working day as <b>Attended</b> or <b>Absent</b>.
+          </p>
+        </div>
+    
+        <div class="manual-tip">
+          <strong>Tip:</strong>
+          If you know your semester end date, enter it.
+          If you don't, use <b>Till Today</b> and update the end date later.
+        </div>
+    
+        <button type="submit" class="solid manual-btn">
+          Got it
+        </button>
+    
+      </form>
+    </dialog>
 
 <section id="settings-page" hidden>
   <div class="sheet">

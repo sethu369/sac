@@ -240,3 +240,58 @@ dialog input[type=text]{width:100%}
 
 @media (max-width:380px){.percent-num{font-size:34px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---------- First-time User Manual ---------- */
+
+.user-manual {
+  width: min(92vw, 420px);
+  max-width: 420px;
+  border: 0;
+  border-radius: 16px;
+  padding: 0;
+  color: var(--text);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+}
+
+.user-manual::backdrop {
+  background: rgba(0, 0, 0, .45);
+}
+
+.user-manual form {
+  padding: 22px;
+}
+
+.user-manual h3 {
+  margin: 0 0 18px;
+  font-size: 20px;
+}
+
+.manual-step {
+  margin-bottom: 16px;
+}
+
+.manual-step strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.manual-step p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.manual-tip {
+  margin-top: 18px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.manual-btn {
+  width: 100%;
+  margin-top: 20px;
+}
