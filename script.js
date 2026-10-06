@@ -363,8 +363,10 @@ const holName = ds => {
 };
 const natural = ds => parse(ds).getDay() !== 0 && !holName(ds);
 /* working() is bounded by the STABLE configured range only — never by the Till Today cutoff,
-   so the calendar always shows the full configured date range regardless of the toggle. */
-const working = (ds, s) => !!s.startDate && !!s.endDate && ds >= s.startDate && ds <= s.endDate && !s.off.includes(ds) && (s.extra.includes(ds) || natural(ds));
+   so the calendar always shows the full configured date range regardless of the toggle.
+   endDate may legitimately be null (user doesn't know their end date yet): in that case the
+   range is open-ended going forward, rather than every date being treated as non-working. */
+const working = (ds, s) => !!s.startDate && ds >= s.startDate && (!s.endDate || ds <= s.endDate) && !s.off.includes(ds) && (s.extra.includes(ds) || natural(ds));
 
 /* The one place Till Today has any effect: where the attendance-calculation cutoff falls. */
 function cutoffDate(s) {
@@ -432,50 +434,6 @@ function remainingWorkingDays(s) {
   return n;
 }
 
-function remainingForTarget(s, soFar) {
-
-  if (!s.startDate || !s.endDate) return null;
-
-  /*
-   * Till Today ON:
-   *
-   * The attendance calculation is only up to today.
-   * Therefore "remaining" for the current calculation
-   * means unmarked working days inside the configured
-   * range that are already part of the active calculation.
-   *
-   * Since future dates are not part of the Till Today
-   * calculation, there are no future days in that window.
-   */
-  if (s.tillToday) {
-    const cutoff = cutoffDate(s);
-
-    if (!cutoff) return null;
-
-    let total = 0;
-
-    for (
-      let d = s.startDate;
-      d <= cutoff;
-      d = addDays(d, 1)
-    ) {
-      if (working(d, s) && !s.attended.includes(d) && !s.absent.includes(d)) {
-        total++;
-      }
-    }
-
-    return total;
-  }
-
-  /*
-   * Till Today OFF:
-   *
-   * Use future working days from today to the configured
-   * semester end.
-   */
-  return remainingWorkingDays(s);
-}
-
 function holidayCount(s, from, to) {
   let hd = 0;
   if (!from || !to || to < from) return 0;
@@ -496,20 +454,22 @@ function totalWorkingDays(s) {
   return n;
 }
 
-function targetInfo(soFar, remaining, targetPct, extra, totalWorking) {
+function targetInfo(s, soFar, remaining, targetPct, extra, totalWorking) {
 
-  if (!soFar.wd && !totalWorking) {
-    return {
-      ok: false,
-      text: 'Set a start and end date to see your target status.'
-    };
+  if (!s.startDate) {
+    return { ok: false, text: 'Set a start date to see your target status.' };
+  }
+
+  // Till Today is off and no end date is stored: there is nothing to calculate from, and we
+  // must not invent an end date to make a number appear.
+  if (!s.tillToday && !s.endDate) {
+    return { ok: false, text: 'Turn on Till Today, or set an end date, to calculate your attendance.' };
   }
 
   const adjusted = Math.max(0, soFar.p - extra);
-  const target = (targetPct + extra) / 100;
 
   // Already reached target.
-  if (adjusted >= targetPct) {
+  if (soFar.wd && adjusted >= targetPct) {
     return {
       ok: true,
       text: `You reached your ${targetPct}% target.`,
@@ -519,31 +479,24 @@ function targetInfo(soFar, remaining, targetPct, extra, totalWorking) {
     };
   }
 
-  /*
-   * IMPORTANT:
-   *
-   * Till Today ON:
-   * Use the current attendance window only.
-   *
-   * Till Today OFF:
-   * Use the full configured range.
-   */
+  // No completed working days yet (e.g. the range starts today, or today is a
+  // Sunday/holiday) — nothing to project from yet.
+  if (!soFar.wd) {
+    return { ok: true, text: 'No working days have occurred yet.', state: 'warn', raw: soFar.p, adjusted };
+  }
+
+  // No known end date (Till Today ON, end date left unset): do not invent a day count or
+  // claim the target is unreachable — we genuinely don't know how many days remain.
+  if (remaining === null) {
+    return { ok: true, text: `You are below your ${targetPct}% target.`, state: 'warn', raw: soFar.p, adjusted };
+  }
+
+  // Known end date: use the real remaining working days and the full configured term.
+  const target = (targetPct + extra) / 100;
   const requiredTotal = Math.ceil(target * totalWorking);
+  const need = Math.max(0, requiredTotal - soFar.at);
 
-  const need = Math.max(
-    0,
-    requiredTotal - soFar.at
-  );
-
-  /*
-   * When Till Today is ON, the active range ends today.
-   * Therefore the remaining days for the current calculation
-   * are the working days between today and the configured end.
-   *
-   * When Till Today is OFF, `remaining` is already the actual
-   * future working days.
-   */
-  if (remaining !== null && need > remaining) {
+  if (need > remaining) {
     return {
       ok: true,
       text: `You need to attend ${need} more days, but only ${remaining} working days remain. ${targetPct}% cannot be reached.`,
@@ -625,13 +578,13 @@ function render() {
   const cutoff = cutoffDate(s),
         soFar = soFarStats(s),
         remaining = remainingWorkingDays(s),
-        targetRemaining = remainingForTarget(s, soFar),
         totalWorking = totalWorkingDays(s),
         extra = D.settings.extraPenalty || 0;
 
   const ti = targetInfo(
+    s,
     soFar,
-    targetRemaining,
+    remaining,
     D.settings.targetPercent,
     extra,
     totalWorking
@@ -640,6 +593,7 @@ function render() {
   $('start-date').value = s.startDate || '';
   $('end-date').value = s.endDate || '';
   $('till-today').checked = s.tillToday;
+  $('end-date').disabled = !!s.tillToday;
   $('attendance-display').textContent = `${soFar.at} / ${soFar.wd} working days`;
   $('percentage-display').textContent = `${soFar.p.toFixed(2)}%`;
   $('bar-fill').style.width = Math.min(100, soFar.p) + '%';
@@ -799,7 +753,22 @@ $('end-date').onchange = e => {
   if (v && s.startDate && v < s.startDate) { toast('End date must not be before start date'); e.target.value = s.endDate || ''; return; }
   s.endDate = v; save(); render();
 };
-$('till-today').onchange = e => { cur().tillToday = e.target.checked; save(); render(); };
+$('till-today').onchange = e => {
+  const s = cur();
+
+  s.tillToday = e.target.checked;
+
+  if (s.tillToday) {
+    s.endDate = null;
+    $('end-date').value = '';
+    $('end-date').disabled = true;
+  } else {
+    $('end-date').disabled = false;
+  }
+
+  save();
+  render();
+};
 $('till-info-btn').onclick = () => {
   const open = $('till-info-detail').hidden;
   $('till-info-detail').hidden = !open;
@@ -1335,72 +1304,6 @@ $('edu-form').onsubmit = () => {
 };
 
 
-/* ---------- Semester selector ---------- */
-
-$('semester-select').onchange = e => {
-
-  D.settings.semester = Math.min(
-    semesterCount(),
-    Math.max(1, parseInt(e.target.value, 10) || 1)
-  );
-
-  save();
-  render();
-};
-
-
-/* ---------- Semester Report ---------- */
-
-function renderSemReport() {
-
-  const wrap = $('sem-report-wrap');
-
-  if (!isSemWise()) {
-    wrap.hidden = true;
-    return;
-  }
-
-  wrap.hidden = false;
-
-  const n = semesterCount();
-  const yrs = years();
-
-  const base =
-    D.settings.category === 'other'
-      ? `other-${slug(D.settings.otherName)}`
-      : D.settings.category;
-
-  let html = '';
-
-  for (let i = 1; i <= n; i++) {
-
-    const key =
-      `${base}-${yrs}y-${n}s-sem${i}`;
-
-    const p = D.profiles[key];
-
-    let pct = '—';
-
-    if (p && p.startDate) {
-      const st =
-        soFarStats(
-          Object.assign(blank(), p)
-        );
-
-      if (st.wd) {
-        pct = st.p.toFixed(2) + '%';
-      }
-    }
-
-    html += `
-      <dt>Semester ${i}</dt>
-      <dd>${pct}</dd>
-    `;
-  }
-
-  $('sem-report-list').innerHTML = html;
-}
-
 /* ---------- Semester selector (Semester Wise profiles only) ---------- */
 $('semester-select').onchange = e => {
   D.settings.semester = Math.min(semesterCount(), Math.max(1, +e.target.value));
@@ -1472,41 +1375,287 @@ $('import-input').onchange = e => {
 };
 
 /* ---------- Daily reminder ---------- */
+/* ---------- Daily reminder ---------- */
+
+let reminderTimer = null;
+let reminderLastDate = today();
+
+function clearReminderTimer() {
+  if (reminderTimer !== null) {
+    clearTimeout(reminderTimer);
+    reminderTimer = null;
+  }
+}
+
+function reminderCanRun() {
+  if (
+    !D.settings.reminderEnabled ||
+    !('Notification' in window) ||
+    Notification.permission !== 'granted' ||
+    !validConfig()
+  ) {
+    return false;
+  }
+
+  const t = today();
+  const s = cur();
+
+  // Outside configured date range
+  if (!s.startDate || t < s.startDate) return false;
+  if (s.endDate && t > s.endDate) return false;
+
+  // Sunday / holiday / non-working day
+  if (!working(t, s)) return false;
+
+  // Already marked
+  if (s.attended.includes(t)) return false;
+  if (s.absent.includes(t)) return false;
+
+  // Already reminded today
+  if (D.settings.lastReminded === t) return false;
+
+  return true;
+}
+
+function sendAttendanceReminder() {
+  if (!reminderCanRun()) return false;
+
+  const t = today();
+
+  try {
+    const notification = new Notification(
+      "Mark today's attendance",
+      {
+        body: 'Open SAC to record whether you were present today.',
+        tag: 'sac-attendance-' + t,
+        renotify: false
+      }
+    );
+
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+
+    D.settings.lastReminded = t;
+    save();
+
+    return true;
+  } catch (e) {
+    console.error('SAC reminder failed:', e);
+    return false;
+  }
+}
+
+function getReminderDelay() {
+  const value = String(D.settings.reminderTime || '19:50');
+  const parts = value.split(':').map(Number);
+
+  if (
+    parts.length !== 2 ||
+    !Number.isInteger(parts[0]) ||
+    !Number.isInteger(parts[1]) ||
+    parts[0] < 0 ||
+    parts[0] > 23 ||
+    parts[1] < 0 ||
+    parts[1] > 59
+  ) {
+    return null;
+  }
+
+  const now = new Date();
+  const target = new Date(now);
+
+  target.setHours(parts[0], parts[1], 0, 0);
+
+  // If today's reminder time has already passed,
+  // schedule the next one for tomorrow.
+  if (target.getTime() <= now.getTime()) {
+    target.setDate(target.getDate() + 1);
+  }
+
+  return target.getTime() - now.getTime();
+}
+
+function scheduleReminder() {
+  clearReminderTimer();
+
+  if (
+    !D.settings.reminderEnabled ||
+    !('Notification' in window) ||
+    Notification.permission !== 'granted' ||
+    !validConfig()
+  ) {
+    return;
+  }
+
+  const delay = getReminderDelay();
+
+  if (delay === null) return;
+
+  reminderTimer = setTimeout(() => {
+    reminderTimer = null;
+
+    // Re-check everything at the actual reminder time.
+    sendAttendanceReminder();
+
+    // Schedule the next day.
+    scheduleReminder();
+  }, Math.max(1000, delay));
+}
+
 async function tryPeriodicSync() {
   if (!('serviceWorker' in navigator)) return false;
+
   try {
     const reg = await navigator.serviceWorker.ready;
-    if ('periodicSync' in reg && 'permissions' in navigator) {
-      const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
-      if (status.state === 'granted') { await reg.periodicSync.register('attendance-reminder', { minInterval: 12 * 60 * 60 * 1000 }); return true; }
+
+    if (
+      'periodicSync' in reg &&
+      'permissions' in navigator
+    ) {
+      const status = await navigator.permissions.query({
+        name: 'periodic-background-sync'
+      });
+
+      if (status.state === 'granted') {
+        await reg.periodicSync.register(
+          'attendance-reminder',
+          {
+            minInterval: 12 * 60 * 60 * 1000
+          }
+        );
+
+        return true;
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('SAC periodic reminder unavailable:', e);
+  }
+
   return false;
 }
+
+async function testAttendanceNotification() {
+  if (!('Notification' in window)) {
+    toast('Notifications are not supported in this browser');
+    return;
+  }
+
+  let permission = Notification.permission;
+
+  if (permission === 'default') {
+    permission = await Notification.requestPermission();
+  }
+
+  if (permission !== 'granted') {
+    toast('Notification permission is blocked. Allow notifications for SAC in browser settings.');
+    return;
+  }
+
+  try {
+    const notification = new Notification(
+      'SAC notification test',
+      {
+        body: 'Notifications are working. Your attendance reminder can use this permission.',
+        tag: 'sac-test-notification'
+      }
+    );
+
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+  } catch (e) {
+    console.error('SAC test notification failed:', e);
+    toast('The browser rejected the notification.');
+  }
+}
+
 $('reminder-enabled').onchange = async e => {
   if (e.target.checked) {
-    if (!('Notification' in window)) { toast('Notifications are not supported in this browser'); e.target.checked = false; return; }
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { toast('Notification permission was not granted'); e.target.checked = false; return; }
+    if (!('Notification' in window)) {
+      toast('Notifications are not supported in this browser');
+      e.target.checked = false;
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission !== 'granted') {
+      toast('Notification permission was not granted');
+      e.target.checked = false;
+      return;
+    }
+
     D.settings.periodicSyncOn = await tryPeriodicSync();
+    D.settings.reminderEnabled = true;
+
+    save();
+    render();
+    scheduleReminder();
+
+    return;
   }
-  D.settings.reminderEnabled = e.target.checked; save(); render();
+
+  D.settings.reminderEnabled = false;
+  clearReminderTimer();
+
+  save();
+  render();
 };
-$('reminder-time').onchange = e => { D.settings.reminderTime = e.target.value; save(); render(); };
-/* Skips Sunday, holidays (both via working()), and dates already marked Attended or Absent;
-   never fires twice for the same date. */
-setInterval(() => {
-  if (!D.settings.reminderEnabled || !('Notification' in window) || Notification.permission !== 'granted' || !validConfig()) return;
-  const now = new Date(), hm = `${pad(now.getHours())}:${pad(now.getMinutes())}`, t = today();
-  if (hm === D.settings.reminderTime && D.settings.lastReminded !== t) {
-    const s = cur();
-    if (working(t, s) && !s.attended.includes(t) && !s.absent.includes(t)) new Notification("Mark today's attendance", { body: 'Open SAC to record whether you were present today.' });
-    D.settings.lastReminded = t; save();
+
+$('reminder-time').onchange = e => {
+  D.settings.reminderTime = e.target.value;
+
+  save();
+  render();
+  scheduleReminder();
+};
+
+/*
+ * If the page becomes visible again, reschedule the reminder.
+ * This handles browser timer throttling/suspension as well as
+ * returning to SAC after leaving it in the background.
+ */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    const currentDate = today();
+
+    if (currentDate !== reminderLastDate) {
+      reminderLastDate = currentDate;
+    }
+
+    scheduleReminder();
   }
-}, 30000);
+});
+
+window.addEventListener('focus', () => {
+  scheduleReminder();
+});
+
+/*
+ * Check once per minute for a date change.
+ * This does NOT replace the exact timeout above.
+ */
+setInterval(() => {
+  const currentDate = today();
+
+  if (currentDate !== reminderLastDate) {
+    reminderLastDate = currentDate;
+    scheduleReminder();
+  }
+}, 60000);
+
+/*
+ * Start the reminder scheduler when SAC loads.
+ */
+scheduleReminder();
 
 /* ---------- Offline support ---------- */
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 
 
 /* ---------- Erase All Data ---------- */
@@ -1579,4 +1728,10 @@ window.addEventListener('focus', render);
 setInterval(() => { if (today() !== lastKnownDate) { lastKnownDate = today(); render(); } }, 60000);
 })();
 
+/* ---------- Footer Year ---------- */
 
+const copyrightYear = document.getElementById('copyright-year');
+
+if (copyrightYear) {
+  copyrightYear.textContent = new Date().getFullYear();
+}

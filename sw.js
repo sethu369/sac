@@ -1,43 +1,113 @@
-const CACHE = 'sac-v6';
-const SHELL = ['./', './index.html', './styles.css', './script.js', './saclogo.png', './manifest.json'];
+const CACHE = 'sac-v4';
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+const SHELL = [
+  './',
+  './index.html',
+  './styles.css',
+  './script.js',
+  './saclogo.png',
+  './manifest.json'
+];
+
+/* ---------- Install ---------- */
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then(cache => cache.addAll(SHELL))
+      .then(() => self.skipWaiting())
+  );
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+/* ---------- Activate ---------- */
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then(keys =>
+        Promise.all(
+          keys
+            .filter(key => key !== CACHE)
+            .map(key => caches.delete(key))
+        )
+      )
       .then(() => self.clients.claim())
   );
 });
 
-// Cache-first for the whole app shell. SAC has no external/network dependency of any kind
-// (no holiday API, no Google Calendar) — everything here is local-only by design.
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fetchPromise = fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
-        return res;
-      }).catch(() => cached);
-      return cached || fetchPromise;
+/* ---------- Fetch ---------- */
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      const network = fetch(event.request)
+        .then(response => {
+          if (response.ok) {
+            caches.open(CACHE).then(cache => {
+              cache.put(event.request, response.clone());
+            });
+          }
+
+          return response;
+        })
+        .catch(() => cached);
+
+      return cached || network;
     })
   );
 });
 
-// Best-effort background reminder. Periodic Background Sync has very limited browser
-// support and this worker cannot read the page's localStorage, so it can only show a
-// generic nudge, never a per-day-aware one. Most browsers will never fire this event —
-// the in-page timer in script.js is the primary reminder mechanism whenever SAC is open.
-self.addEventListener('periodicsync', e => {
-  if (e.tag === 'attendance-reminder') {
-    e.waitUntil(
-      self.registration.showNotification("Don't forget today's attendance", {
-        body: 'Open SAC to check and mark your attendance for today.',
-        tag: 'sac-reminder'
+/* ---------- Background reminder ---------- */
+
+/*
+ * Periodic Background Sync is browser-controlled.
+ * It is NOT an exact-time scheduler.
+ *
+ * If the browser allows this event to run, show a generic
+ * attendance reminder. The service worker cannot read SAC's
+ * localStorage, so it cannot determine whether today is a
+ * Sunday, holiday, Attended, or Absent.
+ */
+self.addEventListener('periodicsync', event => {
+  if (event.tag !== 'attendance-reminder') return;
+
+  event.waitUntil(
+    self.registration.showNotification(
+      "Don't forget today's attendance",
+      {
+        body: 'Open SAC to check and mark your attendance.',
+        tag: 'sac-background-reminder',
+        renotify: false
+      }
+    )
+  );
+});
+
+/* ---------- Notification click ---------- */
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+
+  event.waitUntil(
+    self.clients
+      .matchAll({
+        type: 'window',
+        includeUncontrolled: true
       })
-    );
-  }
+      .then(clients => {
+        for (const client of clients) {
+          if ('focus' in client) {
+            return client.focus();
+          }
+        }
+
+        if (self.clients.openWindow) {
+          return self.clients.openWindow('./');
+        }
+      })
+  );
 });

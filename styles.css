@@ -155,6 +155,100 @@ footer{text-align:center;font-size:11px;color:var(--mu);padding:2px 0 4px}
 .about summary{cursor:pointer;font-weight:800;font-size:13px}
 .about p{margin-top:8px;font-size:12px;color:var(--mu);line-height:1.6}
 
+/* ---------- About Section ---------- */
+
+details.block.about {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+details.block.about > summary {
+  cursor: pointer;
+  font-weight: 700;
+  user-select: none;
+}
+
+details.block.about > summary::marker {
+  color: currentColor;
+}
+
+details.block.about > h3 {
+  margin: 20px 0 10px;
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+details.block.about > h3:first-of-type {
+  margin-top: 18px;
+}
+
+details.block.about > h4 {
+  margin: 16px 0 7px;
+  font-size: 0.94rem;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+details.block.about > p {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--muted, inherit);
+}
+
+details.block.about > ul,
+details.block.about > ol {
+  margin: 8px 0 16px;
+  padding-left: 22px;
+}
+
+details.block.about > ul li,
+details.block.about > ol li {
+  margin: 6px 0;
+  padding-left: 3px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--muted, inherit);
+}
+
+details.block.about > ul li::marker {
+  font-size: 0.75em;
+}
+
+details.block.about > ol li::marker {
+  font-weight: 600;
+}
+
+details.block.about strong {
+  color: inherit;
+  font-weight: 700;
+}
+
+/* Keep the About content readable on small screens */
+@media (max-width: 480px) {
+  details.block.about > h3 {
+    margin-top: 18px;
+    font-size: 0.96rem;
+  }
+
+  details.block.about > h4 {
+    font-size: 0.9rem;
+  }
+
+  details.block.about > p,
+  details.block.about > ul li,
+  details.block.about > ol li {
+    font-size: 0.86rem;
+    line-height: 1.6;
+  }
+
+  details.block.about > ul,
+  details.block.about > ol {
+    padding-left: 20px;
+  }
+}
+
 .danger-zone {
   border: 1px solid rgba(220, 38, 38, 0.35);
   border-radius: 14px;
