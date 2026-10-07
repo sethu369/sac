@@ -41,15 +41,45 @@
   </header>
 
   <main class="home">
-    <button id="config-btn" class="config-btn" aria-haspopup="dialog">
-      <span id="config-summary" class="config-summary-text">Set up your education</span>
-      <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 18l6-6-6-6"/></svg>
-    </button>
-    <section class="range-block" id="sem-select-wrap" aria-label="Semester" hidden>
-      <div class="range-label">Semester</div>
-      <select id="semester-select"></select>
-    </section>
-    <p class="notice" id="parent-note" hidden>Parent-guided attendance — meant to be tracked with a parent or guardian's help.</p>
+    <div class="education-row">
+    
+      <button id="config-btn" class="config-btn" aria-haspopup="dialog">
+        <span id="config-summary" class="config-summary-text">
+          Set up your education
+        </span>
+    
+        <svg class="chev"
+             width="16"
+             height="16"
+             viewBox="0 0 24 24"
+             fill="none"
+             stroke="currentColor"
+             stroke-width="2"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             aria-hidden="true"
+             focusable="false">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </button>
+    
+      <section
+        class="semester-inline"
+        id="sem-select-wrap"
+        aria-label="Semester"
+        hidden
+      >
+        <select
+          id="semester-select"
+          aria-label="Select semester">
+        </select>
+      </section>
+    
+    </div>
+    
+    <p class="notice" id="parent-note" hidden>
+      Parent-guided attendance — meant to be tracked with a parent or guardian's help.
+    </p>
 
     <section class="attend-block" aria-live="polite">
       <div class="attend-label" id="attend-label">Attendance so far</div>
@@ -71,10 +101,16 @@
       <div class="range-label">Date range</div>
       <div class="range-row">
         <input type="date" id="start-date" aria-label="Start date">
+      
         <span class="arrow" aria-hidden="true">→</span>
+      
         <input type="date" id="end-date" aria-label="End date">
+      
+        <label class="chip">
+          <input type="checkbox" id="till-today">
+          <span>Till today</span>
+        </label>
       </div>
-      <label class="chip"><input type="checkbox" id="till-today"><span>Till today</span></label>
     </section>
     <button class="info-toggle" id="till-info-btn" aria-expanded="false" aria-controls="till-info-detail">
       <span aria-hidden="true">ⓘ</span> How Till Today affects your percentage.
@@ -100,13 +136,17 @@
     <section class="day">
       <div class="day-head">
         <b id="today-date">Today</b>
-        <span class="sun-tag" id="sun-tag" hidden>Sunday</span>
+    
+        <span class="sun-tag" id="sun-tag" hidden>
+          Sunday
+        </span>
+    
+        <span id="holiday-name-display" class="pill hol-pill" hidden></span>
+    
+        <span id="absent-reason-display" class="pill ab-pill" hidden></span>
       </div>
-      <div id="holiday-name-display" class="pill hol-pill" hidden></div>
-      <div id="absent-reason-display" class="pill ab-pill" hidden></div>
-
-      <div class="status-group" role="group" id="day-status-group" aria-label="Day status">
-        <span class="group-label">Day status</span>
+    
+      <div class="status-group" role="group" id="day-status-group" aria-label="Day status">        <span class="group-label">Day status</span>
         <div class="btn-row two-col">
           <button id="day-working" class="seg-btn" aria-pressed="false">Working Day</button>
           <button id="day-holiday" class="seg-btn" aria-pressed="false">Holiday</button>
@@ -123,6 +163,7 @@
       <p class="hint tiny" id="future-note" hidden>This date hasn't happened yet.</p>
       <p class="hint tiny" id="notworking-note" hidden>Mark this as a Working Day to record attendance.</p>
     </section>
+
   </main>
 <footer>
   <p class="copyright">
@@ -290,137 +331,160 @@
           <label class="ghost file-btn">Import backup<input type="file" id="import-input" accept="application/json" hidden></label></div>
       </div>
 
-<details class="block about">
-  <summary>About</summary>
+      <details class="block about">
+        <summary>About</summary>
+      
+        <h3>About SAC — Student Attendance Calculator</h3>
+      
+        <p>
+          SAC (Student Attendance Calculator) is a student-focused attendance
+          management tool designed to help students accurately track attendance
+          throughout their academic year. It supports multiple education systems,
+          including school, intermediate, diploma/polytechnic, degree, engineering,
+          IIT, IIIT, PG, and custom courses.
+        </p>
+      
+        <p>
+          The app provides a calendar-based attendance tracker with automatic
+          working-day calculation, configurable academic dates, manual holiday
+          management, attendance targets, penalty adjustments, semester-specific
+          records, and attendance reminders.
+        </p>
+      
+        <h3>Key Features</h3>
+      
+        <ul>
+          <li>Support for school, intermediate, diploma/polytechnic, degree, engineering, IIIT, IIT, PG, and other courses</li>
+          <li>Year-wise and semester-wise academic tracking</li>
+          <li>Custom number of academic years and semesters</li>
+          <li>Independent attendance records for each semester</li>
+          <li>Automatic working-day calculation</li>
+          <li>Manual holiday and non-working-day management</li>
+          <li>Attended and Absent day tracking</li>
+          <li>Attendance percentage calculation</li>
+          <li>Target attendance calculation and remaining working-day analysis</li>
+          <li>Configurable attendance penalties</li>
+          <li>Dark/light mode</li>
+          <li>Daily attendance reminders</li>
+          <li>Offline-first functionality with PWA support</li>
+          <li>Automatic local data saving</li>
+          <li>No account or external holiday service required</li>
+        </ul>
+      
+        <h3>How to Use SAC</h3>
+      
+        <h4>Getting Started</h4>
+      
+        <ol>
+          <li>Open <strong>Education Settings</strong> and select your education type.</li>
+          <li>Configure the required academic years and semesters.</li>
+          <li>Select the semester or academic year you want to track.</li>
+          <li>Set the academic <strong>From</strong> and <strong>To</strong> dates.</li>
+          <li>Enable <strong>Till Today</strong> if you want attendance calculations to use the current date as the completed-day cutoff.</li>
+          <li>SAC generates the applicable working days automatically.</li>
+        </ol>
+      
+        <h4>Tracking Attendance</h4>
+      
+        <p>
+          <strong>Marking Attendance:</strong><br>
+          Open a working day and mark it as <strong>Attended</strong> or
+          <strong>Absent</strong>.
+        </p>
+      
+        <p>
+          <strong>Adding Holidays:</strong><br>
+          Manually mark applicable dates as holidays/non-working days. SAC does not
+          automatically import holidays from external services.
+        </p>
+      
+        <p>
+          <strong>Adjusting Working Days:</strong><br>
+          Individual dates can be configured when your actual academic schedule
+          differs from the automatically generated working days.
+        </p>
+      
+        <p>
+          <strong>Semester Tracking:</strong><br>
+          Each semester maintains its own attendance record, allowing you to switch
+          between semesters and view their individual attendance statistics.
+        </p>
+      
+        <h3>Viewing Statistics</h3>
+      
+        <p>The dashboard automatically displays information such as:</p>
+      
+        <ul>
+          <li>Total scheduled working days</li>
+          <li>Completed working days</li>
+          <li>Days attended</li>
+          <li>Days absent</li>
+          <li>Current attendance percentage</li>
+          <li>Target attendance percentage</li>
+          <li>Required/remaining working days where applicable</li>
+          <li>Penalty-adjusted attendance</li>
+        </ul>
+      
+        <h3>Attendance Reminders</h3>
+      
+        <p>
+          SAC can send a daily notification reminding you to record your attendance.
+          You can configure the reminder time from the settings.
+        </p>
+      
+        <p>
+          Notification delivery in the background depends on browser and device
+          support.
+        </p>
+      
+        <h3>Navigation Tips</h3>
+      
+        <ul>
+          <li>Select the required academic year or semester from the education controls.</li>
+          <li>Use the calendar to navigate between dates and months.</li>
+          <li>Tap a date to view or change its attendance status.</li>
+          <li>Use settings to configure education details, attendance targets, penalties, theme, and reminders.</li>
+          <li>Use <strong>Till Today</strong> when you want attendance calculations to consider only days completed up to the current date.</li>
+        </ul>
+      
+        <h3>Privacy &amp; Offline Usage</h3>
+      
+        <p>
+          Your attendance data is stored locally in your browser. SAC does not
+          require an account or external holiday database to maintain your
+          attendance records.
+        </p>
+      
+        <p>
+          Once installed/cached as a PWA, SAC is designed to continue working
+          offline, allowing you to manage attendance without an internet connection.
+        </p>
+      
+      </details>
 
-  <h3>About SAC — Student Attendance Calculator</h3>
-
-  <p>
-    SAC (Student Attendance Calculator) is a student-focused attendance
-    management tool designed to help students accurately track attendance
-    throughout their academic year. It supports multiple education systems,
-    including school, intermediate, diploma/polytechnic, degree, engineering,
-    IIT, IIIT, PG, and custom courses.
-  </p>
-
-  <p>
-    The app provides a calendar-based attendance tracker with automatic
-    working-day calculation, configurable academic dates, manual holiday
-    management, attendance targets, penalty adjustments, semester-specific
-    records, and attendance reminders.
-  </p>
-
-  <h3>Key Features</h3>
-
-  <ul>
-    <li>Support for school, intermediate, diploma/polytechnic, degree, engineering, IIIT, IIT, PG, and other courses</li>
-    <li>Year-wise and semester-wise academic tracking</li>
-    <li>Custom number of academic years and semesters</li>
-    <li>Independent attendance records for each semester</li>
-    <li>Automatic working-day calculation</li>
-    <li>Manual holiday and non-working-day management</li>
-    <li>Attended and Absent day tracking</li>
-    <li>Attendance percentage calculation</li>
-    <li>Target attendance calculation and remaining working-day analysis</li>
-    <li>Configurable attendance penalties</li>
-    <li>Dark/light mode</li>
-    <li>Daily attendance reminders</li>
-    <li>Offline-first functionality with PWA support</li>
-    <li>Automatic local data saving</li>
-    <li>No account or external holiday service required</li>
-  </ul>
-
-  <h3>How to Use SAC</h3>
-
-  <h4>Getting Started</h4>
-
-  <ol>
-    <li>Open <strong>Education Settings</strong> and select your education type.</li>
-    <li>Configure the required academic years and semesters.</li>
-    <li>Select the semester or academic year you want to track.</li>
-    <li>Set the academic <strong>From</strong> and <strong>To</strong> dates.</li>
-    <li>Enable <strong>Till Today</strong> if you want attendance calculations to use the current date as the completed-day cutoff.</li>
-    <li>SAC generates the applicable working days automatically.</li>
-  </ol>
-
-  <h4>Tracking Attendance</h4>
-
-  <p>
-    <strong>Marking Attendance:</strong><br>
-    Open a working day and mark it as <strong>Attended</strong> or
-    <strong>Absent</strong>.
-  </p>
-
-  <p>
-    <strong>Adding Holidays:</strong><br>
-    Manually mark applicable dates as holidays/non-working days. SAC does not
-    automatically import holidays from external services.
-  </p>
-
-  <p>
-    <strong>Adjusting Working Days:</strong><br>
-    Individual dates can be configured when your actual academic schedule
-    differs from the automatically generated working days.
-  </p>
-
-  <p>
-    <strong>Semester Tracking:</strong><br>
-    Each semester maintains its own attendance record, allowing you to switch
-    between semesters and view their individual attendance statistics.
-  </p>
-
-  <h3>Viewing Statistics</h3>
-
-  <p>The dashboard automatically displays information such as:</p>
-
-  <ul>
-    <li>Total scheduled working days</li>
-    <li>Completed working days</li>
-    <li>Days attended</li>
-    <li>Days absent</li>
-    <li>Current attendance percentage</li>
-    <li>Target attendance percentage</li>
-    <li>Required/remaining working days where applicable</li>
-    <li>Penalty-adjusted attendance</li>
-  </ul>
-
-  <h3>Attendance Reminders</h3>
-
-  <p>
-    SAC can send a daily notification reminding you to record your attendance.
-    You can configure the reminder time from the settings.
-  </p>
-
-  <p>
-    Notification delivery in the background depends on browser and device
-    support.
-  </p>
-
-  <h3>Navigation Tips</h3>
-
-  <ul>
-    <li>Select the required academic year or semester from the education controls.</li>
-    <li>Use the calendar to navigate between dates and months.</li>
-    <li>Tap a date to view or change its attendance status.</li>
-    <li>Use settings to configure education details, attendance targets, penalties, theme, and reminders.</li>
-    <li>Use <strong>Till Today</strong> when you want attendance calculations to consider only days completed up to the current date.</li>
-  </ul>
-
-  <h3>Privacy &amp; Offline Usage</h3>
-
-  <p>
-    Your attendance data is stored locally in your browser. SAC does not
-    require an account or external holiday database to maintain your
-    attendance records.
-  </p>
-
-  <p>
-    Once installed/cached as a PWA, SAC is designed to continue working
-    offline, allowing you to manage attendance without an internet connection.
-  </p>
-
-</details>
-
+      <div class="support-note">
+        <strong>Need help or found an issue?</strong>
+      
+        <p>
+          If you notice any mistakes, bugs, features not working properly,
+          or have an idea for a future feature, please contact us.
+          We'd appreciate your feedback and will look into it.
+        </p>
+      
+        <div class="support-links">
+          <a href="mailto:sethuthangella2006@gmail.com">
+            Email Us
+          </a>
+      
+          <a
+            href="https://www.instagram.com/sethu.thangella?igsh=MWZyc2I0czN0YXky"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Instagram
+          </a>
+        </div>
+      </div>     
 
       <div class="block danger-zone">
         <h3>Danger Zone</h3>
@@ -440,8 +504,8 @@
         </button>
       </div>
       
-      
-      </div>
+
+    </div>
   </div>
 </section>
 

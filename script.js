@@ -651,14 +651,19 @@ function renderDayPanel(s) {
   setPressed('day-working', isWorking);
   setPressed('day-holiday', isHol);
 
-  const isFuture = sel > t;
-  $('future-note').hidden = !isFuture;
-  $('notworking-note').hidden = isFuture || isWorking;
-  $('attend-group').hidden = isFuture || !isWorking;
-  if (!isFuture && isWorking) {
-    setPressed('mark-attended', s.attended.includes(sel));
-    setPressed('mark-absent', isAbsent);
-  }
+const isFuture = sel > t;
+
+$('future-note').hidden = !isFuture;
+$('notworking-note').hidden = isFuture || isWorking;
+$('attend-group').hidden = isFuture || !isWorking;
+
+if (isFuture) {
+  $('mark-attended').setAttribute('aria-pressed', 'false');
+  $('mark-absent').setAttribute('aria-pressed', 'false');
+} else if (isWorking) {
+  setPressed('mark-attended', s.attended.includes(sel));
+  setPressed('mark-absent', isAbsent);
+}
 }
 
 function renderHolidays() {
@@ -1375,79 +1380,16 @@ $('import-input').onchange = e => {
 };
 
 /* ---------- Daily reminder ---------- */
-/* ---------- Daily reminder ---------- */
 
+const REMINDER_GRACE_MS = 10 * 60 * 1000; // accept up to 10 min late
 let reminderTimer = null;
 let reminderLastDate = today();
 
-function clearReminderTimer() {
-  if (reminderTimer !== null) {
-    clearTimeout(reminderTimer);
-    reminderTimer = null;
-  }
-}
-
-function reminderCanRun() {
-  if (
-    !D.settings.reminderEnabled ||
-    !('Notification' in window) ||
-    Notification.permission !== 'granted' ||
-    !validConfig()
-  ) {
-    return false;
-  }
-
-  const t = today();
-  const s = cur();
-
-  // Outside configured date range
-  if (!s.startDate || t < s.startDate) return false;
-  if (s.endDate && t > s.endDate) return false;
-
-  // Sunday / holiday / non-working day
-  if (!working(t, s)) return false;
-
-  // Already marked
-  if (s.attended.includes(t)) return false;
-  if (s.absent.includes(t)) return false;
-
-  // Already reminded today
-  if (D.settings.lastReminded === t) return false;
-
-  return true;
-}
-
-function sendAttendanceReminder() {
-  if (!reminderCanRun()) return false;
-
-  const t = today();
-
-  try {
-    const notification = new Notification(
-      "Mark today's attendance",
-      {
-        body: 'Open SAC to record whether you were present today.',
-        tag: 'sac-attendance-' + t,
-        renotify: false
-      }
-    );
-
-    notification.onclick = () => {
-      window.focus();
-      notification.close();
-    };
-
-    D.settings.lastReminded = t;
-    save();
-
-    return true;
-  } catch (e) {
-    console.error('SAC reminder failed:', e);
-    return false;
-  }
-}
-
-function getReminderDelay() {
+/*
+ * Returns today's configured reminder time as a Date.
+ * If today's time has already passed, returns tomorrow's time.
+ */
+function getNextReminderDate() {
   const value = String(D.settings.reminderTime || '19:50');
   const parts = value.split(':').map(Number);
 
@@ -1464,19 +1406,185 @@ function getReminderDelay() {
   }
 
   const now = new Date();
-  const target = new Date(now);
 
-  target.setHours(parts[0], parts[1], 0, 0);
+  const target = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    parts[0],
+    parts[1],
+    0,
+    0
+  );
 
-  // If today's reminder time has already passed,
-  // schedule the next one for tomorrow.
-  if (target.getTime() <= now.getTime()) {
+  if (target <= now) {
     target.setDate(target.getDate() + 1);
   }
 
-  return target.getTime() - now.getTime();
+  return target;
 }
 
+/*
+ * Returns today's configured reminder time.
+ */
+function getTodayReminderDate() {
+  const value = String(D.settings.reminderTime || '19:50');
+  const parts = value.split(':').map(Number);
+
+  if (
+    parts.length !== 2 ||
+    !Number.isInteger(parts[0]) ||
+    !Number.isInteger(parts[1]) ||
+    parts[0] < 0 ||
+    parts[0] > 23 ||
+    parts[1] < 0 ||
+    parts[1] > 59
+  ) {
+    return null;
+  }
+
+  const now = new Date();
+
+  return new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    parts[0],
+    parts[1],
+    0,
+    0
+  );
+}
+
+/*
+ * Check whether the current time is inside the allowed
+ * recovery window after the configured reminder time.
+ */
+function isReminderWithinGracePeriod() {
+  const target = getTodayReminderDate();
+
+  if (!target) return false;
+
+  const now = Date.now();
+  const targetTime = target.getTime();
+
+  return (
+    now >= targetTime &&
+    now <= targetTime + REMINDER_GRACE_MS
+  );
+}
+
+/*
+ * One authoritative eligibility check.
+ */
+function reminderCanRun() {
+  if (!D.settings.reminderEnabled) return false;
+
+  if (
+    !('Notification' in window) ||
+    Notification.permission !== 'granted'
+  ) {
+    return false;
+  }
+
+  if (!validConfig()) return false;
+
+  const t = today();
+  const s = cur();
+
+  /*
+   * Date range
+   */
+  if (!s.startDate || t < s.startDate) return false;
+
+  /*
+   * Only apply endDate when Till Today is OFF.
+   */
+  if (!s.tillToday && s.endDate && t > s.endDate) {
+    return false;
+  }
+
+  /*
+   * Reminder can only happen during the configured time window.
+   */
+  if (!isReminderWithinGracePeriod()) {
+    return false;
+  }
+
+  /*
+   * Sunday / holiday / non-working day
+   */
+  if (!working(t, s)) return false;
+
+  /*
+   * Already marked
+   */
+  if (s.attended.includes(t)) return false;
+  if (s.absent.includes(t)) return false;
+
+  /*
+   * Already reminded today
+   */
+  if (D.settings.lastReminded === t) return false;
+
+  return true;
+}
+
+/*
+ * Display the notification.
+ */
+function sendAttendanceReminder() {
+  if (!reminderCanRun()) return false;
+
+  const t = today();
+
+  try {
+    const notification = new Notification(
+      "Mark today's attendance",
+      {
+        body: 'Open SAC to record whether you were present today.',
+        tag: 'sac-attendance-' + t,
+        renotify: false,
+        requireInteraction: false
+      }
+    );
+
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+
+    /*
+     * Mark immediately so multiple browser events cannot
+     * produce duplicate notifications.
+     */
+    D.settings.lastReminded = t;
+    save();
+
+    return true;
+
+  } catch (e) {
+    console.error('SAC reminder failed:', e);
+    return false;
+  }
+}
+
+/*
+ * Clear the currently scheduled page timer.
+ */
+function clearReminderTimer() {
+  if (reminderTimer !== null) {
+    clearTimeout(reminderTimer);
+    reminderTimer = null;
+  }
+}
+
+/*
+ * Main scheduler.
+ *
+ * This is the most accurate mechanism available while
+ * the SAC page/PWA JavaScript is running.
+ */
 function scheduleReminder() {
   clearReminderTimer();
 
@@ -1489,21 +1597,38 @@ function scheduleReminder() {
     return;
   }
 
-  const delay = getReminderDelay();
+  const target = getNextReminderDate();
 
-  if (delay === null) return;
+  if (!target) return;
 
+  const delay = target.getTime() - Date.now();
+
+  /*
+   * Keep a small minimum delay so we never create a
+   * zero/negative timeout.
+   */
   reminderTimer = setTimeout(() => {
     reminderTimer = null;
 
-    // Re-check everything at the actual reminder time.
+    /*
+     * Re-check everything at the actual firing time.
+     */
     sendAttendanceReminder();
 
-    // Schedule the next day.
+    /*
+     * Always schedule tomorrow's reminder.
+     */
     scheduleReminder();
+
   }, Math.max(1000, delay));
 }
 
+/*
+ * Background periodic sync.
+ *
+ * This is only a fallback. The browser controls when
+ * periodic sync actually runs.
+ */
 async function tryPeriodicSync() {
   if (!('serviceWorker' in navigator)) return false;
 
@@ -1530,12 +1655,18 @@ async function tryPeriodicSync() {
       }
     }
   } catch (e) {
-    console.warn('SAC periodic reminder unavailable:', e);
+    console.warn(
+      'SAC periodic reminder unavailable:',
+      e
+    );
   }
 
   return false;
 }
 
+/*
+ * Manual notification test.
+ */
 async function testAttendanceNotification() {
   if (!('Notification' in window)) {
     toast('Notifications are not supported in this browser');
@@ -1549,7 +1680,9 @@ async function testAttendanceNotification() {
   }
 
   if (permission !== 'granted') {
-    toast('Notification permission is blocked. Allow notifications for SAC in browser settings.');
+    toast(
+      'Notification permission is blocked. Allow notifications for SAC in browser settings.'
+    );
     return;
   }
 
@@ -1557,8 +1690,9 @@ async function testAttendanceNotification() {
     const notification = new Notification(
       'SAC notification test',
       {
-        body: 'Notifications are working. Your attendance reminder can use this permission.',
-        tag: 'sac-test-notification'
+        body: 'Notifications are working correctly.',
+        tag: 'sac-test-notification',
+        renotify: false
       }
     );
 
@@ -1566,97 +1700,190 @@ async function testAttendanceNotification() {
       window.focus();
       notification.close();
     };
+
   } catch (e) {
-    console.error('SAC test notification failed:', e);
-    toast('The browser rejected the notification.');
+    console.error(
+      'SAC test notification failed:',
+      e
+    );
+
+    toast(
+      'The browser rejected the notification.'
+    );
   }
 }
 
+/*
+ * Enable / disable reminder.
+ */
 $('reminder-enabled').onchange = async e => {
+
   if (e.target.checked) {
+
     if (!('Notification' in window)) {
-      toast('Notifications are not supported in this browser');
+      toast(
+        'Notifications are not supported in this browser'
+      );
+
       e.target.checked = false;
       return;
     }
 
-    const permission = await Notification.requestPermission();
+    if (Notification.permission === 'denied') {
+      toast(
+        'Notifications are blocked for SAC. Enable them in browser/site settings.'
+      );
+
+      e.target.checked = false;
+      return;
+    }
+
+    let permission = Notification.permission;
+
+    if (permission === 'default') {
+      permission =
+        await Notification.requestPermission();
+    }
 
     if (permission !== 'granted') {
-      toast('Notification permission was not granted');
+      toast(
+        'Notification permission was not granted'
+      );
+
       e.target.checked = false;
       return;
     }
 
-    D.settings.periodicSyncOn = await tryPeriodicSync();
     D.settings.reminderEnabled = true;
+
+    /*
+     * Try background fallback.
+     */
+    D.settings.periodicSyncOn =
+      await tryPeriodicSync();
 
     save();
     render();
+
+    /*
+     * Start exact page scheduler.
+     */
     scheduleReminder();
 
     return;
   }
 
+  /*
+   * Disable reminder.
+   */
   D.settings.reminderEnabled = false;
+
   clearReminderTimer();
 
   save();
   render();
 };
 
+/*
+ * Reminder time changed.
+ *
+ * Immediately cancel the old timer and schedule
+ * the new time.
+ */
 $('reminder-time').onchange = e => {
-  D.settings.reminderTime = e.target.value;
+
+  D.settings.reminderTime =
+    e.target.value || '19:50';
 
   save();
   render();
+
   scheduleReminder();
 };
 
 /*
- * If the page becomes visible again, reschedule the reminder.
- * This handles browser timer throttling/suspension as well as
- * returning to SAC after leaving it in the background.
+ * When SAC comes back to the foreground:
+ *
+ * 1. Check whether the reminder time just passed.
+ * 2. Recover a reminder missed because Chrome throttled
+ *    the page.
+ * 3. Reschedule the next reminder.
  */
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    const currentDate = today();
+function handleReminderResume() {
 
-    if (currentDate !== reminderLastDate) {
-      reminderLastDate = currentDate;
-    }
-
-    scheduleReminder();
-  }
-});
-
-window.addEventListener('focus', () => {
-  scheduleReminder();
-});
-
-/*
- * Check once per minute for a date change.
- * This does NOT replace the exact timeout above.
- */
-setInterval(() => {
   const currentDate = today();
 
   if (currentDate !== reminderLastDate) {
     reminderLastDate = currentDate;
-    scheduleReminder();
   }
+
+  /*
+   * Recover only a reminder that was missed recently.
+   * This prevents an old reminder from appearing hours later.
+   */
+  if (reminderCanRun()) {
+    sendAttendanceReminder();
+  }
+
+  scheduleReminder();
+}
+
+/*
+ * One visibility handler only.
+ */
+document.addEventListener(
+  'visibilitychange',
+  () => {
+    if (!document.hidden) {
+      handleReminderResume();
+      render();
+    }
+  }
+);
+
+/*
+ * One focus handler only.
+ */
+window.addEventListener(
+  'focus',
+  () => {
+    handleReminderResume();
+  }
+);
+
+/*
+ * Detect midnight/date changes.
+ */
+setInterval(() => {
+
+  const currentDate = today();
+
+  if (currentDate !== reminderLastDate) {
+
+    reminderLastDate = currentDate;
+
+    /*
+     * New day = new reminder opportunity.
+     */
+    scheduleReminder();
+
+    render();
+  }
+
 }, 60000);
 
 /*
- * Start the reminder scheduler when SAC loads.
+ * Start scheduler.
  */
 scheduleReminder();
 
 /* ---------- Offline support ---------- */
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker
+    .register('sw.js')
+    .catch(() => {});
+}
 
 /* ---------- Erase All Data ---------- */
 
@@ -1717,15 +1944,49 @@ try {
   $('extra-penalty').value = D.settings.extraPenalty || 0;
   $('reminder-enabled').checked = D.settings.reminderEnabled;
   $('reminder-time').value = D.settings.reminderTime;
+
   applyTheme();
+
   if (!validConfig()) openEduDlg();
+
   render();
-  const migNotes = [D.migrationNote, D.migrationNoteV5].filter(Boolean);
-  if (migNotes.length) { toast(migNotes.length > 1 ? 'Your data was upgraded. ' + migNotes.join(' ') : migNotes[0]); delete D.migrationNote; delete D.migrationNoteV5; save(); }
-} catch (e) { console.error('SAC failed to start cleanly:', e); toast('Something went wrong loading your data. Your saved data is untouched.'); }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
-window.addEventListener('focus', render);
-setInterval(() => { if (today() !== lastKnownDate) { lastKnownDate = today(); render(); } }, 60000);
+
+  const migNotes = [
+    D.migrationNote,
+    D.migrationNoteV5
+  ].filter(Boolean);
+
+  if (migNotes.length) {
+    toast(
+      migNotes.length > 1
+        ? 'Your data was upgraded. ' + migNotes.join(' ')
+        : migNotes[0]
+    );
+
+    delete D.migrationNote;
+    delete D.migrationNoteV5;
+
+    save();
+  }
+
+} catch (e) {
+  console.error(
+    'SAC failed to start cleanly:',
+    e
+  );
+
+  toast(
+    'Something went wrong loading your data. Your saved data is untouched.'
+  );
+}
+
+setInterval(() => {
+  if (today() !== lastKnownDate) {
+    lastKnownDate = today();
+    render();
+  }
+}, 60000);
+
 })();
 
 /* ---------- Footer Year ---------- */
