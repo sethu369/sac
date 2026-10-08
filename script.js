@@ -722,13 +722,54 @@ $('mark-attended').onclick = () => {
 
 const absentDlg = $('absent-dlg');
 function openAbsentDlg() {
-  const s = cur(), r = s.absentReasons[sel] || {};
-  const presets = ['Sick', 'Personal', 'Family', 'Medical', 'Travel'];
-  $('absent-reason-type').value = presets.includes(r.reason) ? r.reason : (r.reason ? 'Other' : '');
-  $('absent-reason-note').value = r.note || (r.reason && !presets.includes(r.reason) ? r.reason : '') || '';
+  const s = cur();
+  const r = s.absentReasons[sel] || {};
+
+  const presets = [
+    'Sick',
+    'Medical',
+    'Personal',
+    'Family',
+    'Family Function',
+    'Travel',
+    'Emergency',
+    'Academic Work',
+    'College Event',
+    'Competition / Sports',
+    'Transport Issue'
+  ];
+
+  const isCustom = r.reason && !presets.includes(r.reason);
+
+  $('absent-reason-type').value =
+    isCustom ? '__custom__' : (r.reason || '');
+
+  $('absent-custom-reason').value =
+    isCustom ? r.reason : '';
+
+  $('absent-reason-note').value = r.note || '';
+
+  $('absent-custom-label').hidden = !isCustom;
+  $('absent-custom-reason').hidden = !isCustom;
+
   $('absent-delete').hidden = !(r.reason || r.note);
+
   absentDlg.showModal();
 }
+
+$('absent-reason-type').onchange = e => {
+  const custom = e.target.value === '__custom__';
+
+  $('absent-custom-label').hidden = !custom;
+  $('absent-custom-reason').hidden = !custom;
+
+  if (custom) {
+    $('absent-custom-reason').focus();
+  } else {
+    $('absent-custom-reason').value = '';
+  }
+};
+
 $('mark-absent').onclick = () => {
   const s = cur();
   if (sel > today()) return toast("Can't mark a future date as absent");
@@ -739,9 +780,24 @@ $('mark-absent').onclick = () => {
   else { s.absent.push(sel); save(); render(); openAbsentDlg(); }
 };
 const saveAbsentReason = () => {
-  const s = cur(), reason = $('absent-reason-type').value, note = $('absent-reason-note').value.trim();
-  if (reason || note) s.absentReasons[sel] = { reason, note }; else delete s.absentReasons[sel];
-  absentDlg.close(); save(); render();
+  const s = cur();
+  const type = $('absent-reason-type').value;
+  const custom = $('absent-custom-reason').value.trim();
+  const note = $('absent-reason-note').value.trim();
+
+  const reason = type === '__custom__'
+    ? custom
+    : type;
+
+  if (reason || note) {
+    s.absentReasons[sel] = { reason, note };
+  } else {
+    delete s.absentReasons[sel];
+  }
+
+  absentDlg.close();
+  save();
+  render();
 };
 $('absent-form').onsubmit = saveAbsentReason;
 $('absent-skip').onclick = () => { delete cur().absentReasons[sel]; absentDlg.close(); save(); render(); };

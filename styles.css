@@ -113,10 +113,10 @@ input[type=date],input[type=text],input[type=number],input[type=time],select#dar
 
 /* ---- Day panel --------------------------------------------------- */
 .day{background:var(--sf);border:1px solid var(--bd);border-radius:14px;box-shadow:var(--shadow);padding:12px;display:flex;flex-direction:column;gap:10px;margin-top:2px;}
-.day-head{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0;}
+.day-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;}
 .day-head b{font-size:14px;font-weight:800;flex:0 0 auto;white-space:nowrap;}
 .day-head .sun-tag,
-.day-head .pill{flex:0 1 auto;min-width:0;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.day-head .pill{flex:0 1 auto;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;}
 .sun-tag{font-size:11px;font-weight:700;color:var(--pr);background:var(--su);border-radius:999px;padding:2px 9px}
 .pill{padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600}
 .hol-pill{background:var(--ho);color:var(--hox)}
@@ -134,9 +134,7 @@ footer{text-align:center;font-size:11px;color:var(--mu);padding:2px 0 4px}
 .splink{color:var(--pr);text-decoration:none;font-weight:600}
 .splink:hover{text-decoration:underline}
 
-
 /* ---- Settings sheet ------------------------------------------------ */
-
 #settings-page{position:fixed;inset:0;background:var(--bg);z-index:5;overflow:hidden}
 #settings-page[hidden]{display:none}
 .sheet{height:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column}
@@ -263,13 +261,13 @@ dialog input[type=text]{width:100%}
 .education-row .semester-inline[hidden]{  display:none;}
 
 /* ---- Semester select - match Education button ---------------------- */
-
-.education-row #semester-select{  width:100%;  min-width:0;  height:46px;  padding:0 38px 0 14px;  border:1px solid var(--bd);  border-radius:12px;  background:var(--sf);  color:var(--tx);  font-size:14px;  font-weight:600;  outline:none;  cursor:pointer;  appearance:none;  -webkit-appearance:none; 
+.education-row #semester-select{ align-items: center; width:100%;  min-width:0;  height:43px;  padding:11px 12px;  border:1px solid var(--bd);  border-radius:12px; box-shadow:var(--shadow); background:var(--sf);  color:var(--tx);  font-size:14px;  font-weight:700;  outline:none;  cursor:pointer;  appearance:none;  -webkit-appearance:none; 
  /* Custom dropdown arrow */  
  background-image:linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);  
  background-position: calc(100% - 17px) 20px, calc(100% - 12px) 20px;  
  background-size: 5px 5px,    5px 5px;  
- background-repeat: no-repeat;}
+ background-repeat: no-repeat;
+ }
  /* Hover */
  .education-row #semester-select:hover{  border-color:var(--pr);}
  /* Focus */

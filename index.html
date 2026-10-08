@@ -527,9 +527,33 @@
     <label class="row-label" for="absent-reason-type">Reason (optional)</label>
     <select id="absent-reason-type">
       <option value="">Choose a reason…</option>
-      <option>Sick</option><option>Personal</option><option>Family</option>
-      <option>Medical</option><option>Travel</option><option value="Other">Other</option>
+      <option value="__custom__">Write your own reason…</option>
+    
+      <option>Sick</option>
+      <option>Medical</option>
+      <option>Personal</option>
+      <option>Family</option>
+      <option>Family Function</option>
+      <option>Travel</option>
+      <option>Emergency</option>
+      <option>Academic Work</option>
+      <option>College Event</option>
+      <option>Competition / Sports</option>
+      <option>Transport Issue</option>
+      <option value="Other">Other</option>
     </select>
+    
+    <label class="row-label" for="absent-custom-reason" id="absent-custom-label" hidden>
+      Your reason
+    </label>
+    
+    <input
+      type="text"
+      id="absent-custom-reason"
+      placeholder="Write your reason…"
+      maxlength="80"
+      hidden
+    >
     <label class="row-label" for="absent-reason-note">Note (optional)</label>
     <input type="text" id="absent-reason-note" placeholder="Add a note…" maxlength="80">
     <div class="acts"><button type="button" id="absent-delete" class="ghost" hidden>Delete reason</button>
