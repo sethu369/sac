@@ -1435,18 +1435,20 @@ $('import-input').onchange = e => {
   e.target.value = '';
 };
 
-/* ---------- Daily reminder ---------- */
 
-const REMINDER_GRACE_MS = 10 * 60 * 1000; // accept up to 10 min late
+/* ---------- Daily reminder: validated, single scheduler ---------- */
+
+const REMINDER_GRACE_MS = 10 * 60 * 1000;
+
 let reminderTimer = null;
 let reminderLastDate = today();
 
 /*
- * Returns today's configured reminder time as a Date.
- * If today's time has already passed, returns tomorrow's time.
+ * Safely parse the configured reminder time.
+ * Expected format: HH:MM
  */
-function getNextReminderDate() {
-  const value = String(D.settings.reminderTime || '19:50');
+function getReminderTimeParts() {
+  const value = String(D.settings.reminderTime || '19:00');
   const parts = value.split(':').map(Number);
 
   if (
@@ -1461,43 +1463,16 @@ function getNextReminderDate() {
     return null;
   }
 
-  const now = new Date();
-
-  const target = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    parts[0],
-    parts[1],
-    0,
-    0
-  );
-
-  if (target <= now) {
-    target.setDate(target.getDate() + 1);
-  }
-
-  return target;
+  return parts;
 }
 
 /*
- * Returns today's configured reminder time.
+ * Return today's configured reminder time.
  */
 function getTodayReminderDate() {
-  const value = String(D.settings.reminderTime || '19:50');
-  const parts = value.split(':').map(Number);
+  const parts = getReminderTimeParts();
 
-  if (
-    parts.length !== 2 ||
-    !Number.isInteger(parts[0]) ||
-    !Number.isInteger(parts[1]) ||
-    parts[0] < 0 ||
-    parts[0] > 23 ||
-    parts[1] < 0 ||
-    parts[1] > 59
-  ) {
-    return null;
-  }
+  if (!parts) return null;
 
   const now = new Date();
 
@@ -1513,8 +1488,23 @@ function getTodayReminderDate() {
 }
 
 /*
- * Check whether the current time is inside the allowed
- * recovery window after the configured reminder time.
+ * Return the next future reminder time.
+ */
+function getNextReminderDate() {
+  const target = getTodayReminderDate();
+
+  if (!target) return null;
+
+  if (target.getTime() <= Date.now()) {
+    target.setDate(target.getDate() + 1);
+  }
+
+  return target;
+}
+
+/*
+ * Allow recovery only from the scheduled time through
+ * the following 10 minutes, inclusive.
  */
 function isReminderWithinGracePeriod() {
   const target = getTodayReminderDate();
@@ -1522,16 +1512,17 @@ function isReminderWithinGracePeriod() {
   if (!target) return false;
 
   const now = Date.now();
-  const targetTime = target.getTime();
+  const scheduled = target.getTime();
 
   return (
-    now >= targetTime &&
-    now <= targetTime + REMINDER_GRACE_MS
+    now >= scheduled &&
+    now <= scheduled + REMINDER_GRACE_MS
   );
 }
 
 /*
- * One authoritative eligibility check.
+ * Central eligibility checks.
+ * Every notification must pass these checks.
  */
 function reminderCanRun() {
   if (!D.settings.reminderEnabled) return false;
@@ -1548,46 +1539,36 @@ function reminderCanRun() {
   const t = today();
   const s = cur();
 
-  /*
-   * Date range
-   */
+  // Require a configured start date.
   if (!s.startDate || t < s.startDate) return false;
 
-  /*
-   * Only apply endDate when Till Today is OFF.
-   */
-  if (!s.tillToday && s.endDate && t > s.endDate) {
-    return false;
-  }
+  // Never notify outside the configured course date range.
+  if (s.endDate && t > s.endDate) return false;
 
-  /*
-   * Reminder can only happen during the configured time window.
-   */
-  if (!isReminderWithinGracePeriod()) {
-    return false;
-  }
+  // Never send outside the configured time or grace period.
+  if (!isReminderWithinGracePeriod()) return false;
 
-  /*
-   * Sunday / holiday / non-working day
-   */
+  // Always skip Sunday, even if manually marked as working.
+  if (parse(t).getDay() === 0) return false;
+
+  // Skip registered holidays.
+  if (holName(t)) return false;
+
+  // Skip any other non-working date.
   if (!working(t, s)) return false;
 
-  /*
-   * Already marked
-   */
+  // Skip dates whose attendance has already been recorded.
   if (s.attended.includes(t)) return false;
   if (s.absent.includes(t)) return false;
 
-  /*
-   * Already reminded today
-   */
+  // Prevent duplicate reminders for the same date.
   if (D.settings.lastReminded === t) return false;
 
   return true;
 }
 
 /*
- * Display the notification.
+ * Send one notification after all eligibility checks pass.
  */
 function sendAttendanceReminder() {
   if (!reminderCanRun()) return false;
@@ -1599,7 +1580,7 @@ function sendAttendanceReminder() {
       "Mark today's attendance",
       {
         body: 'Open SAC to record whether you were present today.',
-        tag: 'sac-attendance-' + t,
+        tag: `sac-attendance-${t}`,
         renotify: false,
         requireInteraction: false
       }
@@ -1610,23 +1591,19 @@ function sendAttendanceReminder() {
       notification.close();
     };
 
-    /*
-     * Mark immediately so multiple browser events cannot
-     * produce duplicate notifications.
-     */
+    // Save the date to prevent duplicate notifications.
     D.settings.lastReminded = t;
     save();
 
     return true;
-
-  } catch (e) {
-    console.error('SAC reminder failed:', e);
+  } catch (error) {
+    console.error('SAC reminder failed:', error);
     return false;
   }
 }
 
 /*
- * Clear the currently scheduled page timer.
+ * Cancel the currently scheduled page timer.
  */
 function clearReminderTimer() {
   if (reminderTimer !== null) {
@@ -1636,10 +1613,8 @@ function clearReminderTimer() {
 }
 
 /*
- * Main scheduler.
- *
- * This is the most accurate mechanism available while
- * the SAC page/PWA JavaScript is running.
+ * Schedule the next reminder.
+ * The callback rechecks all rules before sending.
  */
 function scheduleReminder() {
   clearReminderTimer();
@@ -1659,135 +1634,75 @@ function scheduleReminder() {
 
   const delay = target.getTime() - Date.now();
 
-  /*
-   * Keep a small minimum delay so we never create a
-   * zero/negative timeout.
-   */
   reminderTimer = setTimeout(() => {
     reminderTimer = null;
 
-    /*
-     * Re-check everything at the actual firing time.
-     */
     sendAttendanceReminder();
 
-    /*
-     * Always schedule tomorrow's reminder.
-     */
+    // Schedule the next day's reminder.
     scheduleReminder();
-
   }, Math.max(1000, delay));
 }
 
 /*
- * Background periodic sync.
- *
- * This is only a fallback. The browser controls when
- * periodic sync actually runs.
+ * Remove the previous periodic-sync reminder, if supported.
+ * This prevents an old background handler from bypassing
+ * the current attendance and holiday checks.
  */
-async function tryPeriodicSync() {
-  if (!('serviceWorker' in navigator)) return false;
+async function removeLegacyPeriodicReminder() {
+  if (!('serviceWorker' in navigator)) return;
 
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const registration =
+      await navigator.serviceWorker.getRegistration();
 
     if (
-      'periodicSync' in reg &&
-      'permissions' in navigator
+      registration &&
+      registration.periodicSync &&
+      typeof registration.periodicSync.unregister === 'function'
     ) {
-      const status = await navigator.permissions.query({
-        name: 'periodic-background-sync'
-      });
-
-      if (status.state === 'granted') {
-        await reg.periodicSync.register(
-          'attendance-reminder',
-          {
-            minInterval: 12 * 60 * 60 * 1000
-          }
-        );
-
-        return true;
-      }
+      await registration.periodicSync.unregister(
+        'attendance-reminder'
+      );
     }
-  } catch (e) {
+
+    if (D.settings.periodicSyncOn !== false) {
+      D.settings.periodicSyncOn = false;
+      save();
+    }
+  } catch (error) {
     console.warn(
-      'SAC periodic reminder unavailable:',
-      e
+      'SAC could not remove the legacy periodic reminder:',
+      error
     );
   }
-
-  return false;
 }
 
 /*
- * Manual notification test.
+ * Check for a missed reminder when SAC becomes active again.
+ * Recovery is possible only within the 10-minute grace period.
  */
-async function testAttendanceNotification() {
-  if (!('Notification' in window)) {
-    toast('Notifications are not supported in this browser');
-    return;
-  }
+function handleReminderResume() {
+  reminderLastDate = today();
 
-  let permission = Notification.permission;
-
-  if (permission === 'default') {
-    permission = await Notification.requestPermission();
-  }
-
-  if (permission !== 'granted') {
-    toast(
-      'Notification permission is blocked. Allow notifications for SAC in browser settings.'
-    );
-    return;
-  }
-
-  try {
-    const notification = new Notification(
-      'SAC notification test',
-      {
-        body: 'Notifications are working correctly.',
-        tag: 'sac-test-notification',
-        renotify: false
-      }
-    );
-
-    notification.onclick = () => {
-      window.focus();
-      notification.close();
-    };
-
-  } catch (e) {
-    console.error(
-      'SAC test notification failed:',
-      e
-    );
-
-    toast(
-      'The browser rejected the notification.'
-    );
-  }
+  sendAttendanceReminder();
+  scheduleReminder();
 }
 
 /*
- * Enable / disable reminder.
+ * Enable or disable attendance reminders.
  */
 $('reminder-enabled').onchange = async e => {
-
   if (e.target.checked) {
-
     if (!('Notification' in window)) {
-      toast(
-        'Notifications are not supported in this browser'
-      );
-
+      toast('Notifications are not supported in this browser');
       e.target.checked = false;
       return;
     }
 
     if (Notification.permission === 'denied') {
       toast(
-        'Notifications are blocked for SAC. Enable them in browser/site settings.'
+        'Notifications are blocked for SAC. Enable them in browser settings.'
       );
 
       e.target.checked = false;
@@ -1797,41 +1712,37 @@ $('reminder-enabled').onchange = async e => {
     let permission = Notification.permission;
 
     if (permission === 'default') {
-      permission =
-        await Notification.requestPermission();
+      try {
+        permission = await Notification.requestPermission();
+      } catch (error) {
+        console.warn(
+          'SAC notification permission request failed:',
+          error
+        );
+
+        permission = 'denied';
+      }
     }
 
     if (permission !== 'granted') {
-      toast(
-        'Notification permission was not granted'
-      );
-
+      toast('Notification permission was not granted');
       e.target.checked = false;
       return;
     }
 
     D.settings.reminderEnabled = true;
 
-    /*
-     * Try background fallback.
-     */
-    D.settings.periodicSyncOn =
-      await tryPeriodicSync();
+    await removeLegacyPeriodicReminder();
 
     save();
     render();
 
-    /*
-     * Start exact page scheduler.
-     */
-    scheduleReminder();
-
+    // Recover today's reminder only if it is within the
+    // configured grace period and all rules pass.
+    handleReminderResume();
     return;
   }
 
-  /*
-   * Disable reminder.
-   */
   D.settings.reminderEnabled = false;
 
   clearReminderTimer();
@@ -1841,15 +1752,19 @@ $('reminder-enabled').onchange = async e => {
 };
 
 /*
- * Reminder time changed.
- *
- * Immediately cancel the old timer and schedule
- * the new time.
+ * Changing the reminder time only reschedules it.
+ * It does not immediately trigger a notification.
  */
 $('reminder-time').onchange = e => {
+  const value = e.target.value;
 
-  D.settings.reminderTime =
-    e.target.value || '19:50';
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+    toast('Please choose a valid reminder time');
+    render();
+    return;
+  }
+
+  D.settings.reminderTime = value;
 
   save();
   render();
@@ -1858,87 +1773,57 @@ $('reminder-time').onchange = e => {
 };
 
 /*
- * When SAC comes back to the foreground:
- *
- * 1. Check whether the reminder time just passed.
- * 2. Recover a reminder missed because Chrome throttled
- *    the page.
- * 3. Reschedule the next reminder.
+ * Recover and reschedule when SAC becomes visible again.
  */
-function handleReminderResume() {
-
-  const currentDate = today();
-
-  if (currentDate !== reminderLastDate) {
-    reminderLastDate = currentDate;
-  }
-
-  /*
-   * Recover only a reminder that was missed recently.
-   * This prevents an old reminder from appearing hours later.
-   */
-  if (reminderCanRun()) {
-    sendAttendanceReminder();
-  }
-
-  scheduleReminder();
-}
-
-/*
- * One visibility handler only.
- */
-document.addEventListener(
-  'visibilitychange',
-  () => {
-    if (!document.hidden) {
-      handleReminderResume();
-      render();
-    }
-  }
-);
-
-/*
- * One focus handler only.
- */
-window.addEventListener(
-  'focus',
-  () => {
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
     handleReminderResume();
-  }
-);
-
-/*
- * Detect midnight/date changes.
- */
-setInterval(() => {
-
-  const currentDate = today();
-
-  if (currentDate !== reminderLastDate) {
-
-    reminderLastDate = currentDate;
-
-    /*
-     * New day = new reminder opportunity.
-     */
-    scheduleReminder();
-
     render();
   }
+});
 
+/*
+ * Recover and reschedule when the browser window regains focus.
+ */
+window.addEventListener('focus', handleReminderResume);
+
+/*
+ * Detect date changes, including midnight.
+ * This also checks the grace period if the configured reminder
+ * time is near midnight.
+ */
+setInterval(() => {
+  const currentDate = today();
+
+  if (currentDate !== reminderLastDate) {
+    reminderLastDate = currentDate;
+
+    handleReminderResume();
+    render();
+  }
 }, 60000);
 
 /*
- * Start scheduler.
+ * Initial setup.
+ * Check for an eligible reminder after the page loads,
+ * then schedule the next reminder.
  */
-scheduleReminder();
+void removeLegacyPeriodicReminder();
+handleReminderResume();
+
 
 /* ---------- Offline support ---------- */
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker
     .register('sw.js')
-    .catch(() => {});
+    .then(() => removeLegacyPeriodicReminder())
+    .catch(error => {
+      console.warn(
+        'SAC service worker registration failed:',
+        error
+      );
+    });
 }
 
 /* ---------- Erase All Data ---------- */
